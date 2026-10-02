@@ -1,0 +1,103 @@
+<resources>
+    <string name="app_name">LBP OTG Print</string>
+    <string name="printer_card_title">Canon LBP6030/6040/6018L</string>
+    <string name="printer_connected_usb">Connected via USB OTG</string>
+    <string name="printer_not_connected">No printer connected</string>
+    <string name="printer_permission_required">USB permission required</string>
+    <string name="grant_permission">Grant Permission</string>
+    <string name="select_pdf">Select PDF</string>
+    <string name="select_image">Select Image</string>
+    <string name="print_test_page">Print Test Page</string>
+    <string name="btn_print">Print</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_retry">Retry</string>
+    <string name="btn_reconnect">Reconnect</string>
+    <string name="btn_diagnostics">USB Diagnostics</string>
+    <string name="btn_copy_diagnostics">Copy Diagnostics</string>
+    <string name="btn_export_diagnostics">Export Report</string>
+    <string name="btn_export_stream">Export Print Stream</string>
+    <string name="btn_clear_logs">Clear Logs</string>
+    <string name="btn_safe_probe">Run Safe USB Probe</string>
+    
+    <!-- Print Settings -->
+    <string name="settings_title">Print Settings</string>
+    <string name="paper_size">Paper Size</string>
+    <string name="orientation">Orientation</string>
+    <string name="scaling">Scaling</string>
+    <string name="margins">Margins</string>
+    <string name="copies">Copies</string>
+    <string name="quality">Quality</string>
+    <string name="content_mode">Content Mode</string>
+    <string name="dither_mode">Dithering</string>
+    <string name="driver_protocol">Driver Engine</string>
+    
+    <!-- Paper -->
+    <string name="paper_a4">A4 (210 × 297 mm)</string>
+    <string name="paper_a5">A5 (148 × 210 mm)</string>
+    <string name="paper_letter">Letter (8.5 × 11 in)</string>
+    
+    <!-- Orientation -->
+    <string name="orientation_auto">Auto</string>
+    <string name="orientation_portrait">Portrait</string>
+    <string name="orientation_landscape">Landscape</string>
+    
+    <!-- Scaling -->
+    <string name="scaling_fit">Fit to page</string>
+    <string name="scaling_fill">Fill page</string>
+    <string name="scaling_actual">Actual size (100%)</string>
+    
+    <!-- Margins -->
+    <string name="margins_normal">Normal (5mm)</string>
+    <string name="margins_minimum">Minimum (2mm)</string>
+    
+    <!-- Quality -->
+    <string name="quality_draft">Draft (300 DPI)</string>
+    <string name="quality_normal">Standard (600 DPI)</string>
+    <string name="quality_high">High Definition (600 DPI Fine)</string>
+    
+    <!-- Content Mode -->
+    <string name="mode_document">Document / Text (Crisp)</string>
+    <string name="mode_photo">Photo (Smooth Grayscale)</string>
+    
+    <!-- Dithering -->
+    <string name="dither_floyd_steinberg">Floyd-Steinberg Error Diffusion</string>
+    <string name="dither_threshold">Direct Threshold</string>
+    <string name="dither_atkinson">Atkinson Dither</string>
+
+    <!-- Driver Protocols -->
+    <string name="driver_carps2">CARPS2 (Native LBP6030)</string>
+    <string name="driver_ufrii">UFRII LT</string>
+    <string name="driver_raw_pcl">Standard Raster / PCL</string>
+    <string name="driver_debug_dump">Save Stream to File Only</string>
+
+    <!-- Job states -->
+    <string name="state_idle">Ready</string>
+    <string name="state_preparing">Preparing document…</string>
+    <string name="state_rendering">Rendering page %1$d of %2$d…</string>
+    <string name="state_encoding">Encoding page %1$d to printer format…</string>
+    <string name="state_waiting_printer">Waiting for printer ready…</string>
+    <string name="state_sending">Sending to USB OUT: %1$s / %2$s (%3$d%%)…</string>
+    <string name="state_data_sent">Data transmitted successfully</string>
+    <string name="state_finishing">Finishing print job…</string>
+    <string name="state_completed">Print completed</string>
+    <string name="state_cancelled">Print cancelled</string>
+    <string name="state_failed">Print failed: %1$s</string>
+
+    <!-- Errors -->
+    <string name="err_no_printer">No printer connected. Connect Canon LBP via USB OTG cable.</string>
+    <string name="err_no_host">USB Host is not supported on this device.</string>
+    <string name="err_permission_denied">USB permission was denied by user.</string>
+    <string name="err_claim_interface">Failed to claim USB printer interface %1$d.</string>
+    <string name="err_no_bulk_out">No bulk OUT endpoint found on printer interface.</string>
+    <string name="err_disconnected">Printer was disconnected during operation.</string>
+    <string name="err_timeout">USB bulk transfer timed out.</string>
+    <string name="err_short_write">USB short write error: expected %1$d bytes, sent %2$d bytes.</string>
+    <string name="err_render_failed">Failed to render document page: %1$s.</string>
+    <string name="err_encoding_failed">Driver encoding failed: %1$s.</string>
+    <string name="err_paper_out">Printer reported Paper Empty / Tray Out.</string>
+    <string name="err_printer_error">Printer reported hardware error condition.</string>
+
+    <!-- Print Service -->
+    <string name="print_service_name">Canon LBP OTG Print Service</string>
+    <string name="print_service_description">Direct USB OTG printing to Canon LBP6030, LBP6040, and LBP6018L</string>
+</resources>

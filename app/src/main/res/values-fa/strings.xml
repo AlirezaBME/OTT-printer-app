@@ -1,0 +1,103 @@
+<resources>
+    <string name="app_name">LBP OTG Print</string>
+    <string name="printer_card_title">Canon LBP6030/6040/6018L</string>
+    <string name="printer_connected_usb">● متصل از طریق USB OTG</string>
+    <string name="printer_not_connected">هیچ چاپگری متصل نیست</string>
+    <string name="printer_permission_required">مجوز دسترسی به USB لازم است</string>
+    <string name="grant_permission">اعطای مجوز</string>
+    <string name="select_pdf">انتخاب PDF</string>
+    <string name="select_image">انتخاب عکس</string>
+    <string name="print_test_page">چاپ صفحه آزمایشی</string>
+    <string name="btn_print">چاپ</string>
+    <string name="btn_cancel">لغو</string>
+    <string name="btn_retry">تلاش مجدد</string>
+    <string name="btn_reconnect">اتصال مجدد</string>
+    <string name="btn_diagnostics">عیب‌یابی USB</string>
+    <string name="btn_copy_diagnostics">کپی مشخصات</string>
+    <string name="btn_export_diagnostics">ایجاد گزارش خطا</string>
+    <string name="btn_export_stream">خروجی جریان داده چاپ</string>
+    <string name="btn_clear_logs">پاک کردن گزارش‌ها</string>
+    <string name="btn_safe_probe">پویش ایمن USB</string>
+    
+    <!-- Print Settings -->
+    <string name="settings_title">تنظیمات چاپ</string>
+    <string name="paper_size">اندازه کاغذ</string>
+    <string name="orientation">جهت صفحه</string>
+    <string name="scaling">مقیاس‌بندی</string>
+    <string name="margins">حاشیه</string>
+    <string name="copies">تعداد نسخه</string>
+    <string name="quality">کیفیت چاپ</string>
+    <string name="content_mode">نوع محتوا</string>
+    <string name="dither_mode">الگوریتم ترام (Dither)</string>
+    <string name="driver_protocol">موتور درایور چاپگر</string>
+    
+    <!-- Paper -->
+    <string name="paper_a4">A4 (۲۱۰ × ۲۹۷ میلی‌متر)</string>
+    <string name="paper_a5">A5 (۱۴۸ × ۲۱۰ میلی‌متر)</string>
+    <string name="paper_letter">Letter (۸.۵ × ۱۱ اینچ)</string>
+    
+    <!-- Orientation -->
+    <string name="orientation_auto">خودکار</string>
+    <string name="orientation_portrait">عمودی</string>
+    <string name="orientation_landscape">افقی</string>
+    
+    <!-- Scaling -->
+    <string name="scaling_fit">تناسب با صفحه</string>
+    <string name="scaling_fill">پر کردن تمام صفحه</string>
+    <string name="scaling_actual">اندازه واقعی (۱۰۰٪)</string>
+    
+    <!-- Margins -->
+    <string name="margins_normal">معمولی (۵ میلی‌متر)</string>
+    <string name="margins_minimum">حداقل (۲ میلی‌متر)</string>
+    
+    <!-- Quality -->
+    <string name="quality_draft">پیش‌نویس (۳۰۰ DPI)</string>
+    <string name="quality_normal">استاندارد (۶۰۰ DPI)</string>
+    <string name="quality_high">دقت بالا (۶۰۰ DPI با جزئیات)</string>
+    
+    <!-- Content Mode -->
+    <string name="mode_document">متن / سند (واضح و تیره)</string>
+    <string name="mode_photo">تصویر / عکس (سایه‌روشن نرم)</string>
+    
+    <!-- Dithering -->
+    <string name="dither_floyd_steinberg">ترک Floyd-Steinberg</string>
+    <string name="dither_threshold">آستانه مستقیم</string>
+    <string name="dither_atkinson">الگوریتم اتکینسون</string>
+
+    <!-- Driver Protocols -->
+    <string name="driver_carps2">CARPS2 (سازگار LBP6030)</string>
+    <string name="driver_ufrii">UFRII LT</string>
+    <string name="driver_raw_pcl">رستر استاندارد / PCL</string>
+    <string name="driver_debug_dump">ذخیره داده در فایل (اشکال‌زدایی)</string>
+
+    <!-- Job states -->
+    <string name="state_idle">آماده</string>
+    <string name="state_preparing">در حال آماده‌سازی سند…</string>
+    <string name="state_rendering">در حال رندر صفحه %1$d از %2$d…</string>
+    <string name="state_encoding">در حال تبدیل به قالب چاپگر…</string>
+    <string name="state_waiting_printer">در انتظار آماده‌سازی چاپگر…</string>
+    <string name="state_sending">در حال ارسال داده به USB: %1$s از %2$s (%3$d٪)…</string>
+    <string name="state_data_sent">داده با موفقیت ارسال شد</string>
+    <string name="state_finishing">اتمام فرآیند چاپ…</string>
+    <string name="state_completed">چاپ انجام شد</string>
+    <string name="state_cancelled">چاپ لغو شد</string>
+    <string name="state_failed">خطا در چاپ: %1$s</string>
+
+    <!-- Errors -->
+    <string name="err_no_printer">چاپگری متصل نیست. کابل USB OTG را متصل کنید.</string>
+    <string name="err_no_host">دستگاه شما از قابلیت USB Host پشتیبانی نمی‌کند.</string>
+    <string name="err_permission_denied">مجوز دسترسی به USB رد شد.</string>
+    <string name="err_claim_interface">عدم موفقیت در تصاحب درگاه چاپگر %1$d.</string>
+    <string name="err_no_bulk_out">اندپوینت ارسال داده (Bulk OUT) در چاپگر یافت نشد.</string>
+    <string name="err_disconnected">چاپگر هنگام ارتباط قطع شد.</string>
+    <string name="err_timeout">مهلت زمانی انتقال داده USB به پایان رسید.</string>
+    <string name="err_short_write">خطای ارسال ناقص: انتظار %1$d بایت، ارسال %2$d بایت.</string>
+    <string name="err_render_failed">خطا در رندر صفحه سند: %1$s.</string>
+    <string name="err_encoding_failed">خطا در کدگذاری داده‌های چاپ: %1$s.</string>
+    <string name="err_paper_out">چاپگر وضعیت اتمام کاغذ یا باز بودن سینی را اعلام کرد.</string>
+    <string name="err_printer_error">چاپگر وضعیت خطای سخت‌افزاری را اعلام کرد.</string>
+
+    <!-- Print Service -->
+    <string name="print_service_name">سرویس چاپ Canon LBP OTG</string>
+    <string name="print_service_description">چاپ مستقیم USB OTG برای Canon LBP6030 و LBP6040 و LBP6018L</string>
+</resources>

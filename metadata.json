@@ -1,0 +1,6 @@
+{
+  "name": "LBP OTG Print",
+  "description": "Direct USB OTG printing application for Canon LBP6030, LBP6040, and LBP6018L laser printers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

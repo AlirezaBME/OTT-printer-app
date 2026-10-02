@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Canon LBP6030 / LBP6040 / LBP6018L (VID 0x04A9, PID 0x2795) -->
+    <usb-device vendor-id="1193" product-id="10133" />
+    <!-- Canon LBP6000 / LBP6018 (PID 0x271A = 10010) -->
+    <usb-device vendor-id="1193" product-id="10010" />
+    <!-- Canon LBP6020 / LBP6020B (PID 0x275F = 10079) -->
+    <usb-device vendor-id="1193" product-id="10079" />
+    <!-- Canon LBP6200 (PID 0x273B = 10043) -->
+    <usb-device vendor-id="1193" product-id="10043" />
+    <!-- Canon LBP6230 (PID 0x2796 = 10134) -->
+    <usb-device vendor-id="1193" product-id="10134" />
+    <!-- Canon LBP6240 (PID 0x2798 = 10136) -->
+    <usb-device vendor-id="1193" product-id="10136" />
+    <!-- Match any USB Printer class (class 7) device from Canon -->
+    <usb-device vendor-id="1193" class="7" />
+    <!-- Generic USB Printer class fallback -->
+    <usb-device class="7" subclass="1" />
+</resources>
