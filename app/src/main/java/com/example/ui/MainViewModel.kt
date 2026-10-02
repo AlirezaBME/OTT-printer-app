@@ -139,7 +139,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 _printSettings.value.validate()
-                val settings = _printSettings.value
+                val settings = _printSettings.value.let { selected ->
+                    if (selected.orientation == PrintOrientation.AUTO) {
+                        val preview = _previewBitmap.value
+                        selected.copy(orientation = if (preview != null && preview.width > preview.height) PrintOrientation.LANDSCAPE else PrintOrientation.PORTRAIT)
+                    } else selected
+                }
                 var copy: DocumentSource? = null
                 var handedOff = false
                 try {
