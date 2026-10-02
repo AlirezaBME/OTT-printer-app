@@ -6,6 +6,10 @@ data class RasterPage(
     val dpi: Int,
     val data: ByteArray // 1 bit per pixel, MSB first, 1 = black, 0 = white
 ) {
+    init {
+        require(width in 1..20000 && height in 1..20000 && dpi > 0) { "Invalid raster dimensions" }
+        require(data.size.toLong() == ((width.toLong() + 7) / 8) * height) { "Incorrect raster data length" }
+    }
     val bytesPerRow: Int = (width + 7) / 8
     val totalBytes: Int = bytesPerRow * height
 

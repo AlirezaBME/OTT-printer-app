@@ -88,7 +88,10 @@ object PageRenderer {
         }
 
         val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+        canvas.save()
+        canvas.clipRect(printableRect)
         canvas.drawBitmap(sourceBitmap, matrix, paint)
+        canvas.restore()
 
         return targetBitmap
     }

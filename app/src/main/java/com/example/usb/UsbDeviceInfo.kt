@@ -90,8 +90,8 @@ data class UsbDeviceInfo(
                 (ieee1284?.model?.contains("6030", ignoreCase = true) == true)
 
     val primaryPrinterInterface: UsbInterfaceInfo?
-        get() = interfaces.firstOrNull { it.isPrinterClass && it.bulkOutEndpoint != null }
-            ?: interfaces.firstOrNull { it.bulkOutEndpoint != null }
+        get() = interfaces.firstOrNull { it.isPrinterClass && it.interfaceProtocol in 1..2 && it.bulkOutEndpoint != null }
+
 
     val primaryBulkOut: UsbEndpointInfo?
         get() = primaryPrinterInterface?.bulkOutEndpoint

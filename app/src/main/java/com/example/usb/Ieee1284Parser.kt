@@ -9,6 +9,9 @@ data class Ieee1284DeviceId(
     val description: String = "",
     val rawKeyValues: Map<String, String> = emptyMap()
 ) {
+    val supportsPcl5: Boolean
+        get() = commandSet.any { it.uppercase(java.util.Locale.ROOT) in setOf("PCL", "PCL5", "PCL5E", "PCL5C", "PCL 5", "PCL 5E", "PCL 5C") }
+
     val supportsCarps2: Boolean
         get() = commandSet.any { it.contains("CARPS", ignoreCase = true) }
         
@@ -45,7 +48,7 @@ object Ieee1284Parser {
             if (trimmed.isEmpty()) continue
             val colonIdx = trimmed.indexOf(':')
             if (colonIdx > 0) {
-                val key = trimmed.substring(0, colonIdx).trim().uppercase()
+                val key = trimmed.substring(0, colonIdx).trim().uppercase(java.util.Locale.ROOT)
                 val value = trimmed.substring(colonIdx + 1).trim()
                 map[key] = value
             }

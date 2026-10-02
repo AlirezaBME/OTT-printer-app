@@ -97,8 +97,8 @@ fun PrinterStatusCard(
                 Column(modifier = Modifier.weight(1f)) {
                     val displayName = when {
                         deviceInfo?.isLbp6030Family == true -> AppText.targetPrinter()
-                        deviceInfo != null -> deviceInfo.productName ?: "Canon Laser Printer"
-                        else -> AppText.targetPrinter()
+                        deviceInfo != null -> deviceInfo.productName ?: "USB Printer"
+                        else -> AppText.t(isPersian, "چاپگر USB", "USB Printer")
                     }
 
                     Text(
@@ -185,11 +185,16 @@ fun PrinterStatusCard(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
+            if (deviceInfo?.permissionGranted == true && deviceInfo.ieee1284?.supportsPcl5 != true) {
+                Text(AppText.t(isPersian, "برای بررسی سازگاری پویش USB را اجرا کنید. تشخیص دستگاه به معنی پشتیبانی چاپ نیست.",
+                    "Run the USB probe to check compatibility. Detection alone does not establish print support."),
+                    style = MaterialTheme.typography.bodySmall)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
             // Action row
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.End
             ) {
                 if (deviceInfo != null && !deviceInfo.permissionGranted) {
                     Button(

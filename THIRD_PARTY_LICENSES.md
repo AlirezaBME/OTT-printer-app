@@ -1,29 +1,12 @@
-# Third-Party Licenses & Attributions
+# Third-party dependencies
 
-This project references and complies with the following open-source specifications, libraries, and reference drivers:
+Runtime dependencies are AndroidX Core, Activity, Lifecycle and Jetpack Compose (including Material 3/icons), Kotlin, and kotlinx.coroutines. These projects use Apache License 2.0; the Android Gradle Plugin includes dependency metadata in the App Bundle. Review the resolved dependency report before changing dependencies.
 
----
+Test/build-only dependencies include JUnit (EPL 1.0), Robolectric (MIT), AndroidX Test (Apache 2.0), Gradle and the Android build/Kotlin plugins. They are not bundled as app runtime code.
 
-## 1. Android Jetpack & Android Open Source Project (AOSP)
-- **Components:** Android USB Host API, Jetpack Compose, AndroidX Core, AndroidX Lifecycle, Android Print Framework (`android.printservice.PrintService`).
-- **License:** Apache License, Version 2.0
-- **Website:** https://source.android.com
+No Canon proprietary driver libraries, CUPS filters, CARPS/CAPT project code, Firebase, ad SDK, or analytics SDK are bundled. Driver references in DRIVER_RESEARCH.md were inspected for evidence, not copied.
 
----
-
-## 2. ITU-T Recommendation T.6 (CCITT Group 4 2D Compression)
-- **Standard:** International Telecommunication Union (ITU-T) Standard T.6: "Facsimile coding schemes and coding control functions for Group 4 facsimile apparatus".
-- **Implementation:** Clean-room pure Kotlin implementation written specifically for this project without copying third-party code.
-- **Status:** Public international telecommunication standard.
-
----
-
-## 3. Reference Driver Research Attributions
-The following public open-source projects were consulted during protocol research:
-- **`carps-cups`** by Ondrej Zary (GNU General Public License v3.0)
-  https://github.com/ondrej-zary/carps-cups
-- **`captdriver`** and **`studycapt`** by mounaiban / agalakhov (GNU General Public License v2.0)
-  https://github.com/mounaiban/captdriver
-  https://github.com/mounaiban/studycapt
-
-*Note: No proprietary binaries or decompiled code from Canon Inc. are included in this project. All driver encoders are original clean-room implementations adhering to standard documented protocols.*
+Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
+AndroidX: https://android.googlesource.com/platform/frameworks/support/
+Kotlin: https://github.com/JetBrains/kotlin
+Coroutines: https://github.com/Kotlin/kotlinx.coroutines

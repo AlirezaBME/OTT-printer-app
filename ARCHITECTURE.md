@@ -1,90 +1,15 @@
-# LBP OTG Print — Architecture & Design
+# Architecture
 
-This document details the software architecture, data flow pipelines, memory management strategies, and concurrency patterns used in **LBP OTG Print**.
+`MainActivity` hosts Compose and handles single content-URI PDF/image intents. `MainViewModel` owns the selection, language preference, bounded snapshots, preview and UI job manager. Imports and renderer access are serialized; an invalid import leaves the previous document usable.
 
----
+`LbpOtgApplication` owns one `UsbDeviceRepository`. Its operation mutex serializes all device opens, claims, probes, writes and closes across the UI and Android PrintService. The permission manager matches device identity and coalesces requests. Only printer-class interfaces using USB protocol 1 or 2 and a bulk OUT endpoint are eligible.
 
-## 🏛️ Layered Modular Architecture
+`DocumentSource` owns its input and supports previews, print rendering, duplication and close. PDFs render directly into one paper bitmap using physical PDF point units for Actual Size. Images import once, sample to bounded dimensions and correct EXIF orientation. Test pages use on-device drawing. `DitherEngine` converts a bitmap to a packed monochrome raster using three error scanlines.
 
-The application strictly separates document ingestion, rasterization, driver encoding, and hardware transport into isolated layers:
+`PrintJobManager` validates settings, locks USB ownership, checks printer language/status before rendering, spools PCL data to a bounded temporary file, and sends 16 KB chunks. Copies are expanded in document order. A manager rejects overlapping submissions rather than replacing an active job. Cancellation releases ownership in a non-cancellable finally block and explicitly warns that previously transmitted pages may still print. A failed write is not automatically retried, avoiding duplicate physical output. Completed means data generated/delivered, not physical page acknowledgement.
 
-```
-[ PDF / Image Document / Test Page ]
-                 ↓
-      [ DocumentSource Interface ]
-                 ↓
-         [ PageRenderer ]
-  (Scaling, Margins, Orientation, Canvas)
-                 ↓
-       [ DitherEngine ]
-  (Floyd-Steinberg, Atkinson, Threshold)
-                 ↓
-         [ RasterPage ]
-  (1-bit Monochrome Bitmask: 8 pixels/byte)
-                 ↓
-   [ PrinterLanguageEncoder ]
-  (Carps2Encoder / UfriiLtEncoder / RawPclEncoder)
-                 ↓
-       [ Encoded Job Stream ]
-                 ↓
-       [ UsbTransport ]
-  (Safe Chunked Bulk OUT, Error Verification)
-                 ↓
-   [ Physical Canon Laser Printer ]
-```
+`RawPclEncoder` implements uncompressed PCL 5 raster pages with per-page media/orientation/resolution/dimensions and raster start/end commands. Proprietary Canon encoders are unavailable and fail validation.
 
----
+`DocumentPrintAdapter` owns a separate snapshot. It handles layout, requested page subsets, write cancellation and finish cleanup, producing PDFs incrementally with a bounded writer for Android's standard print dialog. Only one bitmap/JPEG is held at a time; output is capped at 256 MB and 10,000 pages. `LbpPrintService` handles sequential system jobs on the main framework thread, uses the shared USB lock, and advertises only printers whose probed language includes PCL 5.
 
-## 📦 Package Breakdown
-
-### 1. `com.example.core.model`
-- **`PaperSize`**: Standard paper formats (`A4`, `A5`, `LETTER`) with exact metric dimensions, pixel calculations at target DPI, and native CARPS/PCL protocol media codes.
-- **`PrintSettings`**: Immutable configuration state container (Paper, Orientation, Scaling, Quality, Content Mode, Dithering Algorithm, Driver Engine, Copies, Page Ranges).
-- **`PrintJob` & `PrintJobState`**: Sealed class state machine tracking job execution:
-  - `Idle` → `Preparing` → `Rendering` → `Encoding` → `WaitingForPrinter` → `Sending` → `DataSent` → `Finishing` → `Completed` / `Failed` / `Cancelled`.
-
-### 2. `com.example.usb`
-- **`UsbTransport`**: Hardware abstraction interface decoupling the printer driver from Android's USB classes (`android.hardware.usb`).
-- **`UsbPrinterTransport`**: Real physical implementation using `UsbManager` and `UsbDeviceConnection`. Enforces:
-  - Safe chunked bulk transfers (16 KB chunks).
-  - Explicit return-value checking on every `bulkTransfer` call.
-  - Active detection of short writes and timeouts.
-  - Standard USB Printer Class 1.1 control requests:
-    - `GET_DEVICE_ID` (Request 0, Type 0xA1) for reading IEEE-1284 string.
-    - `GET_PORT_STATUS` (Request 1, Type 0xA1) for real-time paper and error status.
-    - `SOFT_RESET` (Request 2, Type 0x21).
-- **`FakeUsbTransport`**: Complete mock transport for unit testing and CI environments without hardware.
-- **`UsbDescriptorReader`**: Comprehensive USB descriptor parser extracting interfaces, endpoint addresses, directions, transfer types, and packet sizes.
-- **`Ieee1284Parser`**: Key-value parser for printer IEEE-1284 descriptor responses.
-- **`UsbTraceLogger`**: High-performance circular buffer logging all transport transactions, timings, and error states.
-
-### 3. `com.example.document`
-- **`DocumentSource`**: Unified page-by-page rendering interface.
-- **`PdfDocumentSource`**: Native Android `PdfRenderer` wrapper. Renders pages individually to bounded bitmaps, avoiding loading multi-page documents simultaneously into RAM.
-- **`ImageDocumentSource`**: Memory-bounded bitmap decoder utilizing `inJustDecodeBounds` and `inSampleSize` downsampling. Handles EXIF orientation tags.
-- **`TestPageDocumentSource`**: Vector-drawn high-resolution diagnostic test pattern.
-
-### 4. `com.example.raster`
-- **`RasterPage`**: Packed 1-bit per pixel byte array representation (1 = black toner dot, 0 = white paper background, MSB-first bit order).
-- **`DitherEngine`**: Converts 8-bit grayscale pixels to 1-bit monochrome using Floyd-Steinberg error diffusion with serpentine scanning or Atkinson dithering.
-- **`CcittG4Encoder`**: Pure Kotlin implementation of CCITT Group 4 (ITU-T T.6) 2D fax compression standard. This is the exact compression standard utilized by Canon CARPS / CARPS2 and CUPS filters for monochrome laser printing.
-
-### 5. `com.example.driver`
-- **`PrinterLanguageEncoder`**: Driver engine interface.
-- **`Carps2Encoder`**: Canon Advanced Raster Printing System 2 encoder. Outputs Canon mode entry sequences (`\x1b[K`), paper configuration packets, G4-compressed raster chunks (`\x1b[...r`), and form feeds (`0x0C`).
-- **`UfriiLtEncoder`**: Canon UFRII LT command encoder with universal PJL job encapsulation.
-- **`RawPclEncoder`**: Standard PCL laser raster fallback.
-
-### 6. `com.example.jobs`
-- **`PrintJobManager`**: Sequential job queue executor. Guarantees that only one print job accesses the USB bulk transport at a time.
-- Handles coroutine lifecycle cancellation and safe socket closing.
-
-### 7. `com.example.service`
-- **`LbpPrintService`**: Official Android `PrintService` integration. Exposes the USB printer to Android's native print framework so any third-party app can print to the Canon LBP6030 directly.
-
----
-
-## ⚡ Concurrency & Memory Model
-
-- **Background Dispatchers:** All rasterization, dithering, and driver encoding execute on `Dispatchers.Default`. All USB hardware communication executes on `Dispatchers.IO`. The Android UI thread is never blocked.
-- **Memory Bounded:** At no point is an entire document decoded into uncompressed 32-bit ARGB bitmaps. Each page is rendered, dithered to a 1-bit bitmask (which occupies only ~4.3 MB for a full 600 DPI A4 page: 4960 × 7016 / 8 = 4,349,920 bytes), compressed via CCITT Group 4 (typically reducing to 50–200 KB), and the intermediate bitmaps are promptly recycled.
+Diagnostic/PCL exports use a FileProvider restricted to `cache/exports`. The app has no Internet permission, no analytics/backend, and disabled cloud backup. Release signing is configured only by environment variables.

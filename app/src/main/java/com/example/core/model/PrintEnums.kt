@@ -30,8 +30,8 @@ enum class DitherAlgorithm(val displayName: String) {
 }
 
 enum class DriverType(val displayName: String, val id: String) {
-    CARPS2("Canon CARPS2 (Native LBP6030)", "carps2"),
-    UFRII_LT("Canon UFRII LT", "ufrii_lt"),
+    CARPS2("Canon CARPS2 (Unavailable)", "carps2"),
+    UFRII_LT("Canon UFRII LT (Unavailable)", "ufrii_lt"),
     RAW_PCL("Standard Laser PCL Raster", "raw_pcl"),
-    FILE_STREAM_DUMP("File Stream Dump (Debug Only)", "debug_dump")
+    FILE_STREAM_DUMP("Export PCL file", "debug_dump")
 }

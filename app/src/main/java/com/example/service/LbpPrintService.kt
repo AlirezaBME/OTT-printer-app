@@ -1,132 +1,129 @@
 package com.example.service
 
+import android.net.Uri
 import android.os.ParcelFileDescriptor
-import android.print.PrintAttributes
-import android.print.PrinterCapabilitiesInfo
-import android.print.PrinterId
-import android.print.PrinterInfo
+import android.print.*
 import android.printservice.PrintJob
 import android.printservice.PrintService
 import android.printservice.PrinterDiscoverySession
 import com.example.LbpOtgApplication
-import com.example.core.model.PrintJobState
-import com.example.core.model.PrintSettings
+import com.example.core.model.*
 import com.example.document.PdfDocumentSource
 import com.example.jobs.PrintJobManager
-import com.example.usb.UsbDeviceRepository
-import com.example.usb.UsbTraceLogger
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import java.io.File
-import java.io.FileOutputStream
 
 class LbpPrintService : PrintService() {
-
-    companion object {
-        private const val TAG = "LbpPrintService"
-        const val PRINTER_LOCAL_ID = "canon_lbp6030_usb"
-    }
-
-    private val scope = CoroutineScope(Dispatchers.Main)
-    private lateinit var usbRepository: UsbDeviceRepository
-    private lateinit var printJobManager: PrintJobManager
-
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val repository get() = (application as LbpOtgApplication).usbRepository
+    private lateinit var manager: PrintJobManager
+    private val queue = Channel<PrintJob>(Channel.UNLIMITED)
+    private var activeId: PrintJobId? = null
+    private var activeExecution: Job? = null
     override fun onCreate() {
         super.onCreate()
-        usbRepository = UsbDeviceRepository(this)
-        printJobManager = PrintJobManager(this, usbRepository)
-        UsbTraceLogger.log(TAG, "LbpPrintService initialized.")
-    }
-
-    override fun onCreatePrinterDiscoverySession(): PrinterDiscoverySession {
-        return object : PrinterDiscoverySession() {
-            override fun onStartPrinterDiscovery(priorityList: MutableList<PrinterId>) {
-                val printerId = generatePrinterId(PRINTER_LOCAL_ID)
-                val activeDev = usbRepository.activeDeviceInfo.value
-                val printerName = if (activeDev?.isLbp6030Family == true) {
-                    "Canon LBP6030/6040/6018L (USB OTG)"
-                } else if (activeDev != null) {
-                    "${activeDev.productName ?: "Canon Laser"} (USB OTG)"
-                } else {
-                    "Canon LBP6030 Series (USB OTG)"
+        manager = PrintJobManager(this, repository, scope)
+        scope.launch {
+            for (job in queue) {
+                if (!job.isQueued || !job.start()) continue
+                activeId = job.id
+                activeExecution = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                var source: PdfDocumentSource? = null
+                var temporary: File? = null
+                try {
+                    val descriptor = job.document.data ?: error("No document received")
+                    withContext(Dispatchers.IO) {
+                        temporary = File.createTempFile("service_", ".pdf", cacheDir)
+                        ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input -> temporary!!.outputStream().use { output ->
+                            val buffer = ByteArray(65536)
+                            var count = 0L
+                            while (true) {
+                                ensureActive()
+                                val size = input.read(buffer)
+                                if (size < 0) break
+                                count += size
+                                require(count <= 64L * 1024 * 1024) { "Document exceeds 64 MB" }
+                                output.write(buffer, 0, size)
+                            }
+                        } }
+                        source = PdfDocumentSource(this@LbpPrintService, Uri.fromFile(temporary), job.document.info.name ?: "Document.pdf")
+                    }
+                    val attributes = job.info.attributes ?: error("Missing print attributes")
+                    val media = attributes.mediaSize ?: PrintAttributes.MediaSize.ISO_A4
+                    val paper = when (media.id) {
+                        PrintAttributes.MediaSize.ISO_A4.id -> PaperSize.A4
+                        PrintAttributes.MediaSize.ISO_A5.id -> PaperSize.A5
+                        PrintAttributes.MediaSize.NA_LETTER.id -> PaperSize.LETTER
+                        else -> error("Unsupported paper size")
+                    }
+                    val settings = PrintSettings(paperSize = paper, copies = job.info.copies,
+                        orientation = if (media.isPortrait) PrintOrientation.PORTRAIT else PrintOrientation.LANDSCAPE,
+                        quality = if ((attributes.resolution?.horizontalDpi ?: 300) >= 600) PrintQuality.NORMAL_600DPI else PrintQuality.DRAFT_300DPI,
+                        marginMm = 0f)
+                    val done = CompletableDeferred<PrintJobState>()
+                    manager.startPrintJob(source!!, settings) { done.complete(it) }
+                    when (val result = done.await()) {
+                        is PrintJobState.Completed -> job.complete() // Delivery completed; USB cannot confirm physical output.
+                        is PrintJobState.Cancelled -> job.cancel()
+                        is PrintJobState.Failed -> job.fail(result.reason)
+                        else -> job.fail("Unexpected job state")
+                    }
+                } catch (e: CancellationException) { job.cancel(); throw e }
+                catch (e: Exception) { job.fail(e.message ?: "Print failed") }
+                finally {
+                    withContext(NonCancellable + Dispatchers.IO) {
+                        manager.cancelAndJoin()
+                        source?.close()
+                        temporary?.delete()
+                    }
+                    activeId = null
                 }
-
-                val status = if (activeDev?.permissionGranted == true) {
-                    PrinterInfo.STATUS_IDLE
-                } else {
-                    PrinterInfo.STATUS_UNAVAILABLE
                 }
-
-                val capabilities = PrinterCapabilitiesInfo.Builder(printerId)
-                    .addMediaSize(PrintAttributes.MediaSize.ISO_A4, true)
-                    .addMediaSize(PrintAttributes.MediaSize.ISO_A5, false)
-                    .addMediaSize(PrintAttributes.MediaSize.NA_LETTER, false)
-                    .addResolution(PrintAttributes.Resolution("600dpi", "600 DPI", 600, 600), true)
-                    .addResolution(PrintAttributes.Resolution("300dpi", "300 DPI", 300, 300), false)
-                    .setColorModes(PrintAttributes.COLOR_MODE_MONOCHROME, PrintAttributes.COLOR_MODE_MONOCHROME)
-                    .setMinMargins(PrintAttributes.Margins(200, 200, 200, 200)) // ~5mm
-                    .build()
-
-                val info = PrinterInfo.Builder(printerId, printerName, status)
-                    .setCapabilities(capabilities)
-                    .setDescription("Direct USB OTG Canon LBP Laser Printer")
-                    .build()
-
-                addPrinters(listOf(info))
+                activeExecution?.join()
             }
-
-            override fun onStopPrinterDiscovery() {}
-            override fun onValidatePrinters(printerIds: MutableList<PrinterId>) {}
-            override fun onStartPrinterStateTracking(printerId: PrinterId) {}
-            override fun onStopPrinterStateTracking(printerId: PrinterId) {}
-            override fun onDestroy() {}
         }
     }
-
+    override fun onPrintJobQueued(printJob: PrintJob) { if (queue.trySend(printJob).isFailure) printJob.fail("Print service stopped") }
     override fun onRequestCancelPrintJob(printJob: PrintJob) {
-        printJobManager.cancelCurrentJob()
+        if (activeId == printJob.id) { activeExecution?.cancel(); manager.cancelCurrentJob() }
         printJob.cancel()
     }
-
-    override fun onPrintJobQueued(printJob: PrintJob) {
-        if (!printJob.isQueued) return
-        printJob.start()
-
-        val doc = printJob.document
-        val pfd: ParcelFileDescriptor? = doc.data
-        if (pfd == null) {
-            printJob.fail("No document data received")
-            return
-        }
-
-        scope.launch(Dispatchers.IO) {
-            try {
-                // Copy stream to cache file for PdfDocumentSource
-                val cacheFile = File(cacheDir, "service_job_${System.currentTimeMillis()}.pdf")
-                ParcelFileDescriptor.AutoCloseInputStream(pfd).use { input ->
-                    FileOutputStream(cacheFile).use { output ->
-                        input.copyTo(output)
+    override fun onDestroy() { queue.close(); scope.cancel(); super.onDestroy() }
+    override fun onCreatePrinterDiscoverySession(): PrinterDiscoverySession = object : PrinterDiscoverySession() {
+        private var monitor: Job? = null
+        private var probed: String? = null
+        private val id = generatePrinterId("usb_pcl5")
+        override fun onStartPrinterDiscovery(priorityList: MutableList<PrinterId>) {
+            monitor?.cancel()
+            repository.refreshDevices()
+            monitor = scope.launch {
+                repository.activeDeviceInfo.collect { device ->
+                    if (device == null) { removePrinters(listOf(id)); probed = null; return@collect }
+                    if (device.permissionGranted && device.ieee1284 == null && probed != device.deviceName) {
+                        probed = device.deviceName
+                        repository.safeProbe()
                     }
+                    if (device.ieee1284?.supportsPcl5 != true) { removePrinters(listOf(id)); return@collect }
+                    val capabilities = PrinterCapabilitiesInfo.Builder(id)
+                        .addMediaSize(PrintAttributes.MediaSize.ISO_A4, true)
+                        .addMediaSize(PrintAttributes.MediaSize.ISO_A5, false)
+                        .addMediaSize(PrintAttributes.MediaSize.NA_LETTER, false)
+                        .addResolution(PrintAttributes.Resolution("300", "300 DPI", 300, 300), true)
+                        .addResolution(PrintAttributes.Resolution("600", "600 DPI", 600, 600), false)
+                        .setColorModes(PrintAttributes.COLOR_MODE_MONOCHROME, PrintAttributes.COLOR_MODE_MONOCHROME)
+                        .setMinMargins(PrintAttributes.Margins(200, 200, 200, 200)).build()
+                    val ready = device.permissionGranted && device.portStatus?.isReady != false
+                    addPrinters(listOf(PrinterInfo.Builder(id, device.productName ?: "USB PCL printer",
+                        if (ready) PrinterInfo.STATUS_IDLE else PrinterInfo.STATUS_UNAVAILABLE)
+                        .setCapabilities(capabilities).setDescription("USB OTG • PCL 5 monochrome").build()))
                 }
-
-                val uri = android.net.Uri.fromFile(cacheFile)
-                val docSource = PdfDocumentSource(this@LbpPrintService, uri, printJob.document.info.name ?: "PrintJob.pdf")
-                val settings = PrintSettings()
-
-                printJobManager.startPrintJob(docSource, settings) { finalState ->
-                    when (finalState) {
-                        is PrintJobState.Completed -> printJob.complete()
-                        is PrintJobState.Cancelled -> printJob.cancel()
-                        is PrintJobState.Failed -> printJob.fail(finalState.reason)
-                        else -> {}
-                    }
-                    docSource.close()
-                }
-            } catch (e: Exception) {
-                UsbTraceLogger.logError(TAG, "PrintService job execution failed", e)
-                printJob.fail(e.message ?: "Job failed")
             }
         }
+        override fun onStopPrinterDiscovery() { monitor?.cancel() }
+        override fun onValidatePrinters(printerIds: MutableList<PrinterId>) { repository.refreshDevices() }
+        override fun onStartPrinterStateTracking(printerId: PrinterId) { scope.launch { repository.safeProbe() } }
+        override fun onStopPrinterStateTracking(printerId: PrinterId) {}
+        override fun onDestroy() { monitor?.cancel() }
     }
 }

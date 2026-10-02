@@ -65,7 +65,7 @@
     <string name="dither_atkinson">Atkinson Dither</string>
 
     <!-- Driver Protocols -->
-    <string name="driver_carps2">CARPS2 (Native LBP6030)</string>
+    <string name="driver_carps2">CARPS2 (Unavailable)</string>
     <string name="driver_ufrii">UFRII LT</string>
     <string name="driver_raw_pcl">Standard Raster / PCL</string>
     <string name="driver_debug_dump">Save Stream to File Only</string>
@@ -98,6 +98,6 @@
     <string name="err_printer_error">Printer reported hardware error condition.</string>
 
     <!-- Print Service -->
-    <string name="print_service_name">Canon LBP OTG Print Service</string>
-    <string name="print_service_description">Direct USB OTG printing to Canon LBP6030, LBP6040, and LBP6018L</string>
+    <string name="print_service_name">USB PCL Print Service</string>
+    <string name="print_service_description">USB OTG monochrome printing to PCL 5 printers</string>
 </resources>

@@ -65,7 +65,7 @@
     <string name="dither_atkinson">الگوریتم اتکینسون</string>
 
     <!-- Driver Protocols -->
-    <string name="driver_carps2">CARPS2 (سازگار LBP6030)</string>
+    <string name="driver_carps2">CARPS2 (در دسترس نیست)</string>
     <string name="driver_ufrii">UFRII LT</string>
     <string name="driver_raw_pcl">رستر استاندارد / PCL</string>
     <string name="driver_debug_dump">ذخیره داده در فایل (اشکال‌زدایی)</string>
@@ -98,6 +98,6 @@
     <string name="err_printer_error">چاپگر وضعیت خطای سخت‌افزاری را اعلام کرد.</string>
 
     <!-- Print Service -->
-    <string name="print_service_name">سرویس چاپ Canon LBP OTG</string>
-    <string name="print_service_description">چاپ مستقیم USB OTG برای Canon LBP6030 و LBP6040 و LBP6018L</string>
+    <string name="print_service_name">سرویس چاپ USB PCL</string>
+    <string name="print_service_description">چاپ USB برای چاپگرهای PCL 5</string>
 </resources>

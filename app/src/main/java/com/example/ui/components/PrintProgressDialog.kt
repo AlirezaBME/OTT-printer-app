@@ -87,7 +87,7 @@ fun PrintProgressDialog(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = when (state) {
-                        is PrintJobState.Completed -> AppText.t(isPersian, "چاپ با موفقیت انجام شد", "Print Job Completed")
+                        is PrintJobState.Completed -> AppText.t(isPersian, "داده‌های چاپ آماده شد", "Print data ready")
                         is PrintJobState.Failed -> AppText.t(isPersian, "خطا در چاپ", "Print Job Failed")
                         is PrintJobState.Cancelled -> AppText.t(isPersian, "چاپ لغو شد", "Print Job Cancelled")
                         else -> AppText.t(isPersian, "در حال ارسال به چاپگر", "Printing Document")
@@ -169,12 +169,16 @@ fun PrintProgressDialog(
                     }
 
                     is PrintJobState.Completed -> {
+                        Text(AppText.t(isPersian,
+                            if (job.settings.driverType == com.example.core.model.DriverType.FILE_STREAM_DUMP) "فایل ذخیره شد. هیچ داده‌ای به چاپگر ارسال نشد." else "داده‌ها ارسال شدند. چاپ فیزیکی از طریق USB قابل تأیید نیست؛ صفحات چاپگر را بررسی کنید.",
+                            if (job.settings.driverType == com.example.core.model.DriverType.FILE_STREAM_DUMP) "File saved. No data was sent to a printer." else "Data sent. USB cannot confirm physical printing; check the printed pages."))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "${AppText.t(isPersian, "تعداد صفحه چاپ‌شده:", "Pages printed:")} ${state.pagesPrinted}\n" +
+                            text = "${AppText.t(isPersian, "صفحات پردازش‌شده:", "Pages processed:")} ${state.pagesPrinted}\n" +
                                    "${AppText.t(isPersian, "حجم جریان داده:", "Stream size:")} ${state.totalBytes / 1024} KB\n" +
                                    "${AppText.t(isPersian, "مدت زمان:", "Duration:")} ${state.durationMs / 1000}s",
                             fontSize = 14.sp,
-                            color = Slate600
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -190,7 +194,7 @@ fun PrintProgressDialog(
                             Text(
                                 text = state.technicalDetail,
                                 fontSize = 12.sp,
-                                color = Slate600
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -199,7 +203,7 @@ fun PrintProgressDialog(
                         Text(
                             text = state.reason,
                             fontSize = 14.sp,
-                            color = Slate600
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 

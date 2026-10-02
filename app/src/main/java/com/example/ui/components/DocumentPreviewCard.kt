@@ -96,7 +96,7 @@ fun DocumentPreviewCard(
                     Text(
                         text = "${documentSource.totalPages} ${AppText.t(isPersian, "صفحه", "pages")}",
                         fontSize = 13.sp,
-                        color = Slate600
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -125,7 +125,7 @@ fun DocumentPreviewCard(
                             contentDescription = "Page Preview",
                             contentScale = ContentScale.Fit,
                             modifier = Modifier
-                                .aspectRatio(1f / 1.414f) // Standard A4 ratio
+                                .aspectRatio(previewBitmap.width.toFloat() / previewBitmap.height) // Standard A4 ratio
                                 .testTag("preview_image")
                         )
                     }
@@ -139,7 +139,7 @@ fun DocumentPreviewCard(
                     Text(
                         text = AppText.t(isPersian, "برای پیش‌نمایش، سند PDF یا عکس انتخاب کنید", "Select a PDF or Photo to preview"),
                         fontSize = 13.sp,
-                        color = Slate600
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

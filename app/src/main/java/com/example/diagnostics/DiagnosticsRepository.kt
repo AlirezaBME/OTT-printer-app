@@ -42,19 +42,25 @@ class DiagnosticsRepository(
             )
         }
 
-        val file = File(context.cacheDir, "lbp_diagnostics_${System.currentTimeMillis()}.$extension")
+        val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+        val file = File(dir, "lbp_diagnostics.$extension")
         FileOutputStream(file).use { it.write(content.toByteArray(Charsets.UTF_8)) }
         return file
     }
 
     fun shareReport(context: Context, asJson: Boolean = false) {
         val file = createReportFile(asJson)
+        shareFile(context, file, if (asJson) "application/json" else "text/plain", "Export Diagnostic Report")
+    }
+
+    fun shareFile(context: Context, file: File, mime: String, title: String) {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val intent = Intent(Intent.ACTION_SEND).apply {
-            type = if (asJson) "application/json" else "text/plain"
+            type = mime
             putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newRawUri(title, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(intent, "Export Diagnostic Report"))
+        context.startActivity(Intent.createChooser(intent, title).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }
