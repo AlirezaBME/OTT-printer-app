@@ -1,6 +1,7 @@
 package com.example
 
 import com.example.usb.CanonMlpSession
+import com.example.driver.canon.CanonCpca
 import com.example.usb.UsbTraceLogger
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -22,14 +23,20 @@ class CanonMlpSessionTest {
     @Test fun negotiatesSizeHandlesFragmentedRepliesAndPreservesEveryCpcaByte()=runBlocking {
         val peer=CanonMlpPeer(packetSize=512).apply { readFragment=2 }
         val session=CanonMlpSession(peer)
-        val payload=ByteArray(17001) { (it*31).toByte() }
+        val first=CanonCpca.packet(0x1a,ByteArray(17000) { (it*31).toByte() })
+        val second=CanonCpca.packet(0x13,byteArrayOf(0))
+        val payload=first+second
         session.open()
         var acknowledged=0L
         session.transmit(ByteArrayInputStream(payload),payload.size.toLong()) { acknowledged=it }
         session.finish()
         assertEquals(payload.size.toLong(),acknowledged)
         assertArrayEquals(payload,peer.cpca.toByteArray())
-        assertEquals(34,peer.wire.count { it[0]==1.toByte() })
+        val dataFrames=peer.wire.filter { it[0]==1.toByte() }
+        val firstFragments=(first.size + 505) / 506
+        assertEquals(firstFragments + 1,dataFrames.size)
+        assertArrayEquals(first.copyOfRange(0,506),dataFrames.first().copyOfRange(6,dataFrames.first().size))
+        assertArrayEquals(second,dataFrames[firstFragments].copyOfRange(6,dataFrames[firstFragments].size))
         assertTrue(peer.replies.isEmpty())
         assertEquals(1 + 2*(peer.wire.size-1),peer.transfers.size)
         assertTrue(peer.transfers.drop(1).filterIndexed { i,_ -> i%2==0 }.all { it.size==6 })
@@ -41,7 +48,7 @@ class CanonMlpSessionTest {
         val peer=CanonMlpPeer()
         val session=CanonMlpSession(peer,postJobObservationMs=60)
         session.open()
-        val payload=byteArrayOf(1,2,3,4)
+        val payload=CanonCpca.packet(0x13,byteArrayOf(0))
         session.transmit(ByteArrayInputStream(payload),payload.size.toLong()) {}
         byteArrayOf(2,32,0,8,0,0,0x12,0x34).forEach { peer.replies.add(it) }
         session.finish()
@@ -73,7 +80,8 @@ class CanonMlpSessionTest {
         val peer=CanonMlpPeer(packetSize=512)
         val session=CanonMlpSession(peer);session.open();peer.missingReplies=true
         var progress=0L
-        val result=runCatching { session.transmit(ByteArrayInputStream(ByteArray(10000)),10000) { progress=it } }
+        val payload=CanonCpca.packet(0x1a,ByteArray(9980))
+        val result=runCatching { session.transmit(ByteArrayInputStream(payload),payload.size.toLong()) { progress=it } }
         assertTrue(result.exceptionOrNull() is IOException)
         assertEquals(506,peer.cpca.size());assertEquals(0,progress)
         assertEquals(1,peer.wire.count { it[0]==1.toByte() })
@@ -84,7 +92,8 @@ class CanonMlpSessionTest {
     }
     @Test fun ambiguousWriteIsNotRetried()=runBlocking {
         val peer=CanonMlpPeer();val session=CanonMlpSession(peer);session.open();peer.failWrite=true
-        assertTrue(runCatching { session.transmit(ByteArrayInputStream(ByteArray(100)),100) {} }.exceptionOrNull() is IOException)
+        val payload=CanonCpca.packet(0x13,byteArrayOf(0))
+        assertTrue(runCatching { session.transmit(ByteArrayInputStream(payload),payload.size.toLong()) {} }.exceptionOrNull() is IOException)
         assertEquals(4,peer.wire.size);assertEquals(0,peer.cpca.size())
     }
 }
