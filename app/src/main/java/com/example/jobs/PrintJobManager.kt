@@ -7,6 +7,7 @@ import com.example.document.DocumentSource
 import com.example.driver.DriverRegistry
 import com.example.raster.DitherEngine
 import com.example.usb.UsbDeviceRepository
+import com.example.usb.UsbTraceLogger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -108,6 +109,7 @@ class PrintJobManager(private val context: Context, private val usbRepository: U
                                 state(PrintJobState.Sending(sent, total, (sent * 100 / total).toInt()))
                             }
                         }
+                        UsbTraceLogger.log("PrintJobManager", "Job submitted: driver=${encoder.driverId}, bytes=$sent, pages=$totalSteps. Physical output unconfirmed.")
                     }
                     terminal = PrintJobState.Completed(file.length(), totalSteps, System.currentTimeMillis() - start)
                     _lastCapturedStreamFile.value?.delete()

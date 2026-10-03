@@ -1,5 +1,7 @@
 # Canon interoperability reference tooling
 
+rc4 adds full-page finalization checks against the official filter stream. Intermediate bands use continuation byte `01` and SLIM end control `FE/00`; the final band uses `00` and `FE/01`. Both controls are checked in every Android-generated page, in addition to decoding every raster pixel. rc3's pixel-only oracle did not catch its incorrect final-band controls.
+
 These tools run Canon's checksum-pinned official v5.00 Linux/x86_64 driver as an offline oracle. They do not open a printer. Canon programs are downloaded/extracted into a separate scratch directory and are not distributed with the app or repository. Requires Linux x86_64, Python 3.12+, `dpkg-deb`, GCC, Ghostscript and libcups.
 
 ```sh

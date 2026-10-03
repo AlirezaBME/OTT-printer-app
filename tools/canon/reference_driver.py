@@ -145,6 +145,39 @@ def cpca_packets(stream):
     return packets
 
 
+def slim_end_code(encoded):
+    # The official page filter pads its end token with ones. Discard padding,
+    # including the low one in FE/01, to distinguish page end from band end.
+    bits = ''.join(f'{value ^ 0x43:08b}' for value in encoded).rstrip('1')
+    if bits.endswith('1111111000'):
+        return 0
+    if bits.endswith('111111100'):
+        return 1
+    raise AssertionError('Missing SLIM band/page end control')
+
+
+def verify_reference_page_end(pdl):
+    bands, offset = [], 54
+    width, height = struct.unpack_from('>HH', pdl, 33)
+    y = 0
+    while y < height:
+        assert pdl[offset:offset + 3] == bytes.fromhex('62e385')
+        bw, rows = struct.unpack_from('>HH', pdl, offset + 3)
+        assert bw == width and struct.unpack_from('>H', pdl, offset + 11)[0] == y
+        length = struct.unpack_from('>H', pdl, offset + 17)[0]
+        payload = pdl[offset + 22:offset + 22 + length]
+        last = y + rows == height
+        assert payload[:8] == bytes.fromhex('0309060100005000')
+        assert payload[8] == (0 if last else 1), 'Official band continuation flag changed'
+        code = slim_end_code(payload[13:-1])
+        assert code == int(last), 'Official SLIM end control changed'
+        bands.append({'rows': rows, 'y': y, 'continuation': payload[8], 'endCode': code})
+        y += rows
+        offset += 22 + length
+    assert pdl[offset:] == bytes.fromhex('131211')
+    return bands
+
+
 def verify_protocol(root):
     lib = prepare(root)
     output = root / "reference-cpca-job.prn"
@@ -213,8 +246,10 @@ def verify_protocol(root):
     }
     expected_frames = dict(line.split("\t") for line in (fixtures / "ncap-native-frames.tsv").read_text().splitlines())
     assert {name: data.hex() for name, data in frames.items()} == expected_frames
+    endings = verify_reference_page_end((root / 'reference-ncap-pdl.prn').read_bytes())
     result = {"oracle": "Canon v5.00 module and native NCAP framing functions", "driverArchiveSha256": SHA256,
               "cpcaMessagesMatched": len(fixed) - 1, "ncapFramesMatched": len(frames),
+              "referenceBandEndings": endings,
               "recordedBeforeTransport": True, "physicalPrintVerified": False}
     (root / "protocol-oracle-results.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result, indent=2))
@@ -285,8 +320,11 @@ def verify_jobs(root, jobs):
             length = struct.unpack_from(">H", pdl, offset + 17)[0]
             assert pdl[offset + 19] == 0x9d and struct.unpack_from(">H", pdl, offset + 20)[0] == length
             payload = pdl[offset + 22:offset + 22 + length]
-            assert len(payload) == length and payload[:9] == bytes.fromhex("030906010000500001") and payload[-1] == 0x80
+            last = expected_y + rows == height
+            assert len(payload) == length and payload[:8] == bytes.fromhex("0309060100005000") and payload[-1] == 0x80
+            assert payload[8] == (0 if last else 1), 'Incorrect final-band continuation flag'
             encoded = payload[13:-1]
+            assert slim_end_code(encoded) == int(last), 'Incorrect SLIM page termination'
             assert struct.unpack_from("<I", payload, 9)[0] == len(encoded) + 4
             params = (byte * 8).from_buffer_copy(payload[:8])
             incoming = (byte * (len(encoded) + 8)).from_buffer_copy(encoded + bytes(8))

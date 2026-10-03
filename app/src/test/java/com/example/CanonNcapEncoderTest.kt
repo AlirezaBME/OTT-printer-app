@@ -78,6 +78,36 @@ class CanonNcapEncoderTest {
         }
     }
 
+    @Test fun finalBandEndsEachPageWithOfficialContinuationAndSlimControls() {
+        val settings = PrintSettings(paperSize = PaperSize.A5)
+        val width = PaperSize.A5.getPixelWidth(300)
+        val height = PaperSize.A5.getPixelHeight(300)
+        val raster = RasterPage(width, height, 300, ByteArray((width + 7) / 8 * height))
+        val encoder = CanonNcapEncoder()
+        encoder.encodeJobStart(settings, 2)
+        repeat(2) { page ->
+            val pdl = ByteArrayOutputStream().apply {
+                packets(encoder.encodePage(raster, page + 1, 2, settings)).forEach { (_, data) -> write(data, 1, data.size - 1) }
+            }.toByteArray()
+            var offset = 34 // Page-only PDL excludes the twenty-byte job header.
+            var y = 0
+            val actualHeight = u16(pdl, 15)
+            while (y < actualHeight) {
+                val rows = u16(pdl, offset + 5)
+                val length = u16(pdl, offset + 17)
+                val last = y + rows == actualHeight
+                assertEquals("Page ${page + 1}, y=$y continuation", if (last) 0 else 1, pdl[offset + 30].toInt())
+                val encoded = pdl.copyOfRange(offset + 35, offset + 22 + length - 1)
+                val bits = encoded.joinToString("") { ((it.toInt() and 255) xor 0x43).toString(2).padStart(8, '0') }.trimEnd('1')
+                assertTrue("Page ${page + 1}, y=$y SLIM end", bits.endsWith(if (last) "111111100" else "1111111000"))
+                y += rows
+                offset += 22 + length
+            }
+            assertArrayEquals(hex("1312"), pdl.copyOfRange(offset, pdl.size))
+        }
+        encoder.encodeJobEnd()
+    }
+
     @Test fun automaticSelectionRequiresExactSupportedIdentity() {
         val id=Ieee1284Parser.parseString("MFG:Canon;MDL:LBP6030;CMD:LIPSLX,CPCA;CID:CA_UFRIILT_OIP;")
         val device=UsbDeviceInfo("canon",0x04a9,0x2795,"Canon","LBP6030",null,null,0,0,0,0,emptyList(),true,ieee1284=id)

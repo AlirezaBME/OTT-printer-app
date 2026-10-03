@@ -10,7 +10,7 @@ import java.io.ByteArrayOutputStream
 object CanonSlimRasterCodec {
     const val MAX_BAND_BYTES = 100 * 1024
 
-    fun encodeBand(packedRaster: ByteArray): ByteArray {
+    fun encodeBand(packedRaster: ByteArray, lastBand: Boolean = false): ByteArray {
         require(packedRaster.isNotEmpty() && packedRaster.size <= MAX_BAND_BYTES) {
             "SLIM band must contain 1..$MAX_BAND_BYTES packed raster bytes"
         }
@@ -20,10 +20,12 @@ object CanonSlimRasterCodec {
             if (unsigned == 0) writer.put(0xfd, 8)
             else writer.put(0xd00 or unsigned, 12)
         }
-        // Normal band end. Always add a full padding word when already word-aligned,
+        // Canon's page filter uses FE/00 for intermediate bands and FE/01 for
+        // the final band. Raster decoding alone accepts both; firmware also needs
+        // the page-end control. Always add a full padding word when word-aligned,
         // matching Canon's decoder's lookahead and its reference encoder's padding.
         writer.put(0xfe, 8)
-        writer.put(0, 2)
+        writer.put(if (lastBand) 1 else 0, 2)
         val padding = 32 - writer.bitCount % 32
         repeat(padding) { writer.put(1, 1) }
         return writer.bytes()
