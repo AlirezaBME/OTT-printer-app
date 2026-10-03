@@ -87,7 +87,7 @@ fun PrinterStatusCard(
                     Icon(
                         imageVector = Icons.Default.Print,
                         contentDescription = "Printer",
-                        tint = PrimaryBlue,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -129,7 +129,7 @@ fun PrinterStatusCard(
                             text = statusText,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium,
-                            color = if (deviceInfo != null && deviceInfo.permissionGranted) StatusGreen else Slate600
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -166,7 +166,7 @@ fun PrinterStatusCard(
                         }
                         SuggestionChip(
                             onClick = {},
-                            label = { Text(portLabel, fontSize = 11.sp, color = if (deviceInfo.portStatus.paperEmpty) StatusRed else StatusGreen) },
+                            label = { Text(portLabel, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                             colors = SuggestionChipDefaults.suggestionChipColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant
                             )
@@ -200,7 +200,7 @@ fun PrinterStatusCard(
                     Button(
                         onClick = onRequestPermission,
                         modifier = Modifier.testTag("grant_permission_button"),
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
                         Text(AppText.t(isPersian, "اعطای مجوز USB", "Grant USB Permission"), fontSize = 13.sp)
                     }

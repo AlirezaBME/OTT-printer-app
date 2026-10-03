@@ -79,4 +79,12 @@ class DriverAndPipelineTest {
         assertTrue(UsbPrinterPortStatus.fromByte(0x18).isReady)
         for (status in listOf(0x38, 0x10, 0x08)) assertFalse(UsbPrinterPortStatus.fromByte(status.toByte()).isReady)
     }
+    @Test fun truncatedDeviceIdCannotBecomeAFalsePclMatch() {
+        val partial = "CMD:PCL".toByteArray(Charsets.US_ASCII)
+        val parsed = Ieee1284Parser.parse(byteArrayOf(0, 30) + partial)
+        assertFalse(parsed.supportsPcl5)
+        assertEquals("", parsed.rawString)
+        assertFalse(Ieee1284Parser.parse(byteArrayOf(0, 1, 67)).supportsPcl5)
+    }
+
 }

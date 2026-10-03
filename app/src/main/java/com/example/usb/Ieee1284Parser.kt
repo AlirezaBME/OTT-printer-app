@@ -29,13 +29,9 @@ object Ieee1284Parser {
             return Ieee1284DeviceId(rawString = "")
         }
         val length = ((rawBytes[0].toInt() and 0xFF) shl 8) or (rawBytes[1].toInt() and 0xFF)
-        val stringBytes = if (rawBytes.size >= length && length > 2) {
-            rawBytes.copyOfRange(2, length)
-        } else if (rawBytes.size > 2) {
-            rawBytes.copyOfRange(2, rawBytes.size)
-        } else {
-            rawBytes
-        }
+        // A truncated command set must never be mistaken for PCL (for example PCLXL cut after PCL).
+        if (length !in 2..rawBytes.size) return Ieee1284DeviceId(rawString = "")
+        val stringBytes = rawBytes.copyOfRange(2, length)
         val rawStr = String(stringBytes, Charsets.US_ASCII).trim()
         return parseString(rawStr)
     }

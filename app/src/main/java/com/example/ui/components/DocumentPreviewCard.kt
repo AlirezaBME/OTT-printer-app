@@ -79,7 +79,7 @@ fun DocumentPreviewCard(
                 Icon(
                     imageVector = Icons.Default.Description,
                     contentDescription = "Document",
-                    tint = PrimaryBlue,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -132,7 +132,7 @@ fun DocumentPreviewCard(
                 } else if (documentSource != null) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(36.dp),
-                        color = PrimaryBlue,
+                        color = MaterialTheme.colorScheme.primary,
                         strokeWidth = 3.dp
                     )
                 } else {

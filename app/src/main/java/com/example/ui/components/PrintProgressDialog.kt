@@ -64,7 +64,7 @@ fun PrintProgressDialog(
             } else {
                 OutlinedButton(
                     onClick = onCancel,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusRed),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                     modifier = Modifier.testTag("cancel_job_button")
                 ) {
                     Text(AppText.t(isPersian, "لغو چاپ", "Cancel Print"))
@@ -186,7 +186,7 @@ fun PrintProgressDialog(
                         Text(
                             text = state.reason,
                             fontSize = 14.sp,
-                            color = StatusRed,
+                            color = MaterialTheme.colorScheme.error,
                             fontWeight = FontWeight.SemiBold
                         )
                         if (state.technicalDetail.isNotEmpty()) {

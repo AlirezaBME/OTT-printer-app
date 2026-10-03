@@ -91,7 +91,7 @@ fun DiagnosticsSheet(
                     Icon(
                         imageVector = Icons.Default.Usb,
                         contentDescription = "USB",
-                        tint = PrimaryBlue,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -117,7 +117,7 @@ fun DiagnosticsSheet(
                 Button(
                     onClick = onSafeProbe,
                     enabled = !isSafeProbing,
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier.testTag("safe_probe_button")
                 ) {
                     if (isSafeProbing) {

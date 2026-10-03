@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
@@ -63,7 +66,7 @@ import com.example.ui.components.PrintSettingsPanel
 import com.example.ui.strings.AppText
 import com.example.ui.theme.PrimaryBlue
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun MainScreen(viewModel: MainViewModel, onSystemPrint: (com.example.document.DocumentSource, com.example.core.model.PrintSettings) -> Unit) {
     val isLoading by viewModel.isLoading.collectAsState()
@@ -176,10 +179,10 @@ fun MainScreen(viewModel: MainViewModel, onSystemPrint: (com.example.document.Do
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .widthIn(max = 500.dp)
-                                .height(52.dp)
+                                .heightIn(min = 52.dp)
                                 .testTag("print_button"),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Print,
@@ -245,15 +248,16 @@ fun MainScreen(viewModel: MainViewModel, onSystemPrint: (com.example.document.Do
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    Row(
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         FilledTonalButton(
                             onClick = { pdfPickerLauncher.launch(arrayOf("application/pdf")) },
                             enabled = !isPrinting,
                             modifier = Modifier
-                                .weight(1f)
+                                .widthIn(min = 140.dp)
                                 .testTag("select_pdf_button")
                         ) {
                             Icon(
@@ -272,7 +276,7 @@ fun MainScreen(viewModel: MainViewModel, onSystemPrint: (com.example.document.Do
                                 )
                             },
                             modifier = Modifier
-                                .weight(1f)
+                                .widthIn(min = 140.dp)
                                 .testTag("select_image_button"),
                             enabled = !isPrinting
                         ) {
@@ -289,7 +293,7 @@ fun MainScreen(viewModel: MainViewModel, onSystemPrint: (com.example.document.Do
                             onClick = { viewModel.loadTestPage() },
                             enabled = !isPrinting,
                             modifier = Modifier
-                                .weight(1f)
+                                .widthIn(min = 140.dp)
                                 .testTag("test_page_button")
                         ) {
                             Icon(
