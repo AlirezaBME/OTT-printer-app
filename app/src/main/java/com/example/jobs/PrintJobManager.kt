@@ -8,6 +8,7 @@ import com.example.driver.DriverRegistry
 import com.example.raster.DitherEngine
 import com.example.usb.UsbDeviceRepository
 import com.example.usb.UsbTraceLogger
+import com.example.usb.CanonMlpSession
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -68,6 +69,12 @@ class PrintJobManager(private val context: Context, private val usbRepository: U
                     val memory = (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).memoryClass
                     check(settings.quality.dpi <= 300 || memory >= 256) { "Use 300 DPI on this device to avoid running out of memory." }
                     val encoder = DriverRegistry.getEncoder(resolvedDriver)
+                    val canonSession = if (resolvedDriver == DriverType.UFRII_LT) CanonMlpSession(usbRepository.transport) else null
+                    if (canonSession != null) {
+                        state(PrintJobState.WaitingForPrinter("Opening Canon USB print channels…"))
+                        submissionStarted = true
+                        canonSession.open()
+                    }
                     val directory = File(context.cacheDir, "exports").apply { mkdirs() }
                     spool = File.createTempFile("print_", if (resolvedDriver == DriverType.UFRII_LT) ".prn" else ".pcl", directory)
                     val file = spool!!
@@ -98,15 +105,23 @@ class PrintJobManager(private val context: Context, private val usbRepository: U
                         var sent = 0L
                         val total = file.length()
                         file.inputStream().use { input ->
-                            val buffer = ByteArray(16384)
-                            while (true) {
-                                ensureActive()
-                                val size = input.read(buffer)
-                                if (size < 0) break
-                                submissionStarted = true
-                                usbRepository.transport.writeBulk(buffer.copyOf(size), timeoutMs = if (resolvedDriver == DriverType.UFRII_LT) 15000 else 3000, chunkSize = 16384).getOrThrow()
-                                sent += size
-                                state(PrintJobState.Sending(sent, total, (sent * 100 / total).toInt()))
+                            if (canonSession != null) {
+                                canonSession.transmit(input, total) { acknowledged ->
+                                    sent = acknowledged
+                                    state(PrintJobState.Sending(sent, total, (sent * 100 / total).toInt()))
+                                }
+                                canonSession.finish()
+                            } else {
+                                val buffer = ByteArray(16384)
+                                while (true) {
+                                    ensureActive()
+                                    val size = input.read(buffer)
+                                    if (size < 0) break
+                                    submissionStarted = true
+                                    usbRepository.transport.writeBulk(buffer.copyOf(size), timeoutMs = 3000, chunkSize = 16384).getOrThrow()
+                                    sent += size
+                                    state(PrintJobState.Sending(sent, total, (sent * 100 / total).toInt()))
+                                }
                             }
                         }
                         UsbTraceLogger.log("PrintJobManager", "Job submitted: driver=${encoder.driverId}, bytes=$sent, pages=$totalSteps. Physical output unconfirmed.")

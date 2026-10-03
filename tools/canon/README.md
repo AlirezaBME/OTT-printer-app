@@ -8,6 +8,7 @@ These tools run Canon's checksum-pinned official v5.00 Linux/x86_64 driver as an
 python3 tools/canon/reference_driver.py verify-slim --work-dir /tmp/canon-reference
 python3 tools/canon/reference_driver.py generate --work-dir /tmp/canon-reference
 python3 tools/canon/reference_driver.py verify-protocol --work-dir /tmp/canon-reference
+python3 tools/canon/reference_driver.py verify-mlp --work-dir /tmp/canon-reference
 CANON_JOB_OUTPUT=/tmp/canon-android-jobs ./gradlew :app:testDebugUnitTest
 python3 tools/canon/reference_driver.py verify-jobs --work-dir /tmp/canon-reference --jobs-dir /tmp/canon-android-jobs
 ```
@@ -22,4 +23,6 @@ python3 tools/canon/reference_driver.py verify-jobs --work-dir /tmp/canon-refere
 
 Results are written as JSON manifests and explicitly carry `physicalPrintVerified=false`. GitHub Actions builds the Android fixtures, downloads them in the oracle job, and repeats all comparisons. Test fixture streams contain generated patterns only, not user documents. Neither proprietary Canon binaries nor release signing credentials are included in uploaded results.
 
-The implemented Android backend uses the observed CPCA print-stream mode with no requested acknowledgements. Interactive CPCA status RPCs are a separate API. The backend does not invent a Bind exchange or treat generic bulk writes as proof of paper output. See [driver findings](../../DRIVER_RESEARCH.md) for physical acceptance criteria.
+`verify-mlp` retains real Info initialization and proves that the LBP6030 PPD selects `multi_usb_ncap` and the USB MLP plugin. It invokes the actual native initialization, channel open/close, packet serializer and receive-credit methods with fake I/O. Sixteen vectors cover three socket pairs, packet lengths and credit restoration. This closes a gap in the older recorder: its replacement of Info initialization concealed the USB layer.
+
+The Android backend wraps the observed inner CPCA stream in Canon USB MLP packets and requires initialization, data and close replies. Interactive CPCA status RPCs are a separate API. The backend does not invent a Bind exchange or treat generic bulk writes as proof of paper output. See [driver findings](../../DRIVER_RESEARCH.md) for physical acceptance criteria.

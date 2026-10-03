@@ -1,6 +1,6 @@
 # Driver findings
 
-The original AI-generated claims of a “genuine CARPS2” and “UFRII LT” implementation were unsupported. The invented encoders have been removed. A complete independent NCAP/CPCA print-stream backend now exists for the reported LBP6030 identity. Software encoding is verified against the official driver; physical output is pending.
+The original AI-generated claims of a “genuine CARPS2” and “UFRII LT” implementation were unsupported. The invented encoders have been removed. A complete independent NCAP/CPCA print-stream backend now exists for the reported LBP6030 identity. Software encoding is verified against the official driver; physical output remains unverified. rc3 and rc4 were tested by the owner and produced no paper.
 
 References inspected on 2026-10-02:
 
@@ -29,7 +29,7 @@ The LBP6030/6040/6018L PPD selects `rastertosfp`, `CNOEFLibName:ncapfilterr`, `C
 ```text
 CUPS raster → rastertosfp → cnrsdrvsfp → libncapfilterr
                                        → libcanonncapr → libcanon_slimsfp
-                                       → cnpkmodulencapr → CPCA communication → USB
+                                       → cnpkmodulencapr → CPCA communication → USB MLP → USB
 ```
 
 The supplied source includes the raster-to-process glue, `cnpklib` process/output orchestration and JBIG wrapper. It does **not** contain the core NCAP page encoder, SLIM compressor, session module or CPCA communication implementation as portable source. Those components are delivered as ELF/static binaries. JBIG's presence does not imply that this specific model's default raster path uses JBIG; the inspected NCAP library imports `lCaptCompEx` from the SLIM library.
@@ -48,7 +48,7 @@ The user's rc3 report on Xiaomi Android 15 confirms successful transmission of a
 
 rc4 emits both observed final controls on each page, including copies and multi-page jobs. A two-page regression checks the controls, and the independent oracle now parses Canon's complete generated reference page and checks intermediate/final controls in every Android-generated job. Physical acceptance still requires the real printer; this correction is not inferred from USB transfer success.
 
-The offline recorder replaces the official module's `Info_Initialize_FilterCalled`, `Info_commJobWrite` and other Info calls before transport. It captures a complete `cnpkmodulencapr` job without touching a printer. Its CPCA envelope is `CD CA 10 00`, sequence zero, stream user ID `FFFF0000`, and zero trailing reserved/user fields. The module uses this response-free print-stream mode; the interactive status API uses a different request/response lifecycle. `glue_cpcaSendData` → `NCT_CPCA_SendData` → `caioWrite` passes the raw job bytes through, with local buffering. `CPCA_Bind` opens local transport contexts; it is not a mandatory wire-level Bind packet to be invented.
+The offline recorder replaces the official module's `Info_Initialize_FilterCalled`, `Info_commJobWrite` and other Info calls before transport. It captures a complete `cnpkmodulencapr` job without touching a printer. Its CPCA envelope is `CD CA 10 00`, sequence zero, stream user ID `FFFF0000`, and zero trailing reserved/user fields. This captures the inner CPCA print stream only. It does not capture the USB MLP transport, which requires replies. `glue_cpcaSendData` → `NCT_CPCA_SendData` → `caioWrite` passes inner job bytes into a selected transport context. `CPCA_Bind` opens local transport contexts; it is not a mandatory wire-level Bind packet to be invented.
 
 `CanonCpca` implements that print-stream mode: JobStart2 attributes, default unauthenticated job settings, binder/document setup, 600-DPI environment, paper-save setting, channel-1 PDL transfer chunks with 16-bit length bounds, impression counters and document/binder/job end. Optional timestamp and host UUID metadata are omitted; fixed generic job/owner names avoid embedding device identifiers or document names. Authentication/accounting defaults and all non-metadata setup/footer bytes match the observed official output. The final byte counts and packet boundaries are independently checked.
 
@@ -56,9 +56,17 @@ The reference harness compares 24 fixed CPCA messages against the official modul
 
 The application's primary Print button now invokes the direct job manager. Automatic selection recognizes only Canon `04A9:2795` with `CA_UFRIILT_OIP`, `LIPSLX`, and `CPCA`, or an explicitly advertised PCL 5 language. Android printing remains a separately named action. The print service advertises those supported identities. USB ownership remains serialized; failures/cancellation release locks and reset a partially submitted input stream without automatically retrying ambiguous writes. Canon writes have a finite 15-second timeout to allow printer backpressure.
 
+## Missing USB multichannel transport — rc5
+
+The owner's rc4 trace reports 8,895,951 bytes accepted by raw USB, with no paper output. The previous oracle replaced `Info_Initialize_FilterCalled` and therefore missed the transport selected by real initialization. Keeping actual Info initialization with the LBP6030 PPD changes the device URI from `usb://...` to `multi_usb_ncap://...`. The actual CUPS communicator selects scheme 3, job plugin 3: **libcomm_usbmlportr.so**. Sending the CPCA stream directly to the endpoint bypassed that layer in rc3/rc4.
+
+`verify-mlp` now retains actual Info initialization, stubs external I/O, and invokes the official x86_64 library's InitSub, OpenSub, CloseSub, SendSub2 and RecvSub methods with fake I/O callbacks. It verifies initialization `00 00 00 08 01 00 00 08`, successful reply payload `80 00 08`, and the three host/printer socket pairs `01/10`, `02/20`, `03/30`. The job writer selects channel 1. Channel-open payloads contain opcode 1, the socket pair and six FF bytes; replies negotiate total packet sizes. Headers and payloads are written in separate USB transfers, matching the native WritePort calls. Six-byte headers encode socket pair, big-endian total length, credit byte 1 and flags 0. Job writes use flags 0. Opening gives one transmit credit, and the library's RecvSub restores one credit for each received packet, including empty packets with header credit byte zero. Do not substitute generic IEEE 1284.4 credit semantics for these observed Canon semantics.
+
+`CanonMlpSession` performs that initialization and opens all three channels before rendering. It sends the unchanged rc4 CPCA/NCAP stream inside negotiated, bounded MLP packets and waits for a reply on channel 1 before sending the next packet. It drains asynchronous replies, handles fragmented/coalesced input using whole USB reads, enforces deadlines and size/socket checks, and requires successful channel-close replies. A silent printer fails before page data; an absent data reply stops further transmission. Writes are not retried automatically. Failures and cancellation reset partial jobs and release USB ownership. Diagnostics include channel negotiation and acknowledgement counts. These are printer transport acknowledgements, not evidence of physical paper output.
+
 ## Remaining hardware/release acceptance
 
-No successful physical print or bidirectional hardware trace is available in this workspace. Validate the rc3 testing APK on the reported phone/printer: one built-in page, a multi-page PDF, image, each supported media/orientation, copies/ranges, denied permission, paper-out, disconnect, cancellation and reconnect. Compare output placement/density and actual printer acceptance. Physical output cannot be inferred solely from an accepted bulk write, native decoder success or matching packet builders.
+No successful physical print or bidirectional hardware trace is available in this workspace. Validate the rc5 testing APK on the reported phone/printer: one built-in page, a multi-page PDF, image, each supported media/orientation, copies/ranges, denied permission, paper-out, disconnect, cancellation and reconnect. Compare output placement/density and actual printer acceptance. Physical output cannot be inferred solely from an accepted bulk write, native decoder success or matching packet builders.
 
 For a Linux reference capture, locate the USB bus with `lsusb -t`, enable `usbmon`, capture that bus with Wireshark or `tcpdump -i usbmonBUS -s 0 -w canon-test.pcap`, and print one known page through Canon's official queue. Keep both Bulk OUT and Bulk IN traffic and note the printer/driver version and paper result. The offline recorder manifest explicitly states `recordedBeforeTransport=true` and `physicalPrintVerified=false`.
 

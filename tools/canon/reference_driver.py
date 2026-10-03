@@ -352,14 +352,18 @@ def verify_jobs(root, jobs):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["prepare", "generate", "verify-slim", "verify-protocol", "verify-jobs"])
+    parser.add_argument("action", choices=["prepare", "generate", "verify-slim", "verify-protocol", "verify-jobs", "verify-mlp"])
     parser.add_argument("--work-dir", type=Path, required=True, help="External scratch directory; driver binaries must not be committed")
     parser.add_argument("--jobs-dir", type=Path, help="Android-generated complete print jobs (verify-jobs only)")
     args = parser.parse_args()
     root = args.work_dir.expanduser().resolve()
     if root == HERE or HERE in root.parents:
         parser.error("Use a scratch directory outside tools/canon")
-    if args.action == "verify-jobs":
+    if args.action == "verify-mlp":
+        lib = prepare(root)
+        env = os.environ | {"LD_LIBRARY_PATH": str(lib) + ":" + str(lib / "Canon/CUPS_SFPR/Bidi") + ":" + str(lib / "Canon/CUPS_SFPR/Libs")}
+        subprocess.run(["python3", str(HERE / "mlp_oracle.py"), str(root)], env=env, check=True, timeout=60)
+    elif args.action == "verify-jobs":
         if not args.jobs_dir:
             parser.error("verify-jobs requires --jobs-dir")
         verify_jobs(root, args.jobs_dir.resolve())

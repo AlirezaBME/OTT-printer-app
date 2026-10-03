@@ -40,6 +40,6 @@ class ExampleRobolectricTest {
     assertTrue(ieee.getBoolean("directUsbDriverAvailable"))
     val text = DiagnosticReport.generatePlainText(device, listOf(device))
     assertTrue(text.contains("CID: CA_UFRIILT_OIP"))
-    assertTrue(text.contains("NCAP + CPCA print stream"))
+    assertTrue(text.contains("NCAP + CPCA over acknowledged USB MLP"))
   }
 }
