@@ -25,7 +25,7 @@ data class UsbTraceEvent(
 }
 
 object UsbTraceLogger {
-    private const val MAX_LOGS = 300
+    private const val MAX_LOGS = 5000
     private val deque = ConcurrentLinkedDeque<UsbTraceEvent>()
     
     private val _eventsFlow = MutableStateFlow<List<UsbTraceEvent>>(emptyList())
