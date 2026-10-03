@@ -1,6 +1,7 @@
 package com.example
 
 import com.example.usb.CanonMlpSession
+import com.example.usb.UsbTraceLogger
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
@@ -34,6 +35,22 @@ class CanonMlpSessionTest {
         assertTrue(peer.transfers.drop(1).filterIndexed { i,_ -> i%2==0 }.all { it.size==6 })
         assertEquals(3,peer.wire.count { it[0]==0.toByte() && it[6]==2.toByte() })
     }
+
+    @Test fun postJobObservationCapturesAsynchronousChannelPayloadBeforeClose()=runBlocking {
+        UsbTraceLogger.clear()
+        val peer=CanonMlpPeer()
+        val session=CanonMlpSession(peer,postJobObservationMs=60)
+        session.open()
+        val payload=byteArrayOf(1,2,3,4)
+        session.transmit(ByteArrayInputStream(payload),payload.size.toLong()) {}
+        byteArrayOf(2,32,0,8,0,0,0x12,0x34).forEach { peer.replies.add(it) }
+        session.finish()
+        val logs=UsbTraceLogger.getLogs()
+        assertTrue(logs.any { it.message.contains("post-job observation") && it.message.contains("channel=2/32") })
+        assertTrue(logs.any { it.message.contains("Post-job Canon observation complete") && it.message.contains("payloadFrames=1") })
+        UsbTraceLogger.clear()
+    }
+
     @Test fun silentPrinterCannotReceiveRasterData()=runBlocking {
         val peer=CanonMlpPeer().apply { missingReplies=true }
         val result=runCatching { CanonMlpSession(peer).open() }
