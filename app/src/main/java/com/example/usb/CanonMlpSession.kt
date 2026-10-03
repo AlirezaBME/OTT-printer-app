@@ -136,13 +136,11 @@ class CanonMlpSession(
             if (remainingMs <= 0) break
             val timeout = remainingMs.coerceAtMost(150).coerceAtLeast(1)
             val buffer = ByteArray(16384)
-            val count = transport.readBulk(buffer, timeout).getOrElse {
+            val readResult = transport.readBulk(buffer, timeout)
+            val count = readResult.getOrNull()
+            if (count == null || count <= 0) {
                 // Android bulkTransfer reports timeout and several USB errors as -1.
                 // During this bounded observation window a quiet timeout is expected.
-                delay(10)
-                continue
-            }
-            if (count <= 0) {
                 delay(10)
                 continue
             }
