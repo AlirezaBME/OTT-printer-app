@@ -1,5 +1,7 @@
 # Candidate verification — 2026-10-03
 
+This is the historical **1.1.0-rc1** record. The subsequent **1.1.0-rc2** Canon research/diagnostics candidate has its own [verification report in the release assets](https://github.com/AlirezaBME/OTT-printer-app/releases/download/v1.1.0-rc2/VERIFICATION-rc2.md). Neither candidate implements a complete Canon USB driver.
+
 Version 1.1.0-rc1 (version code 2), application ID `com.aistudio.lbpotgprint.kxvlzp`.
 
 ## Reproducible source and results

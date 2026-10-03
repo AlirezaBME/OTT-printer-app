@@ -9,6 +9,8 @@
 
 Host tests cover strict/Persian page ranges, settings validation, explicit PCL 5 detection, rejection of unavailable Canon encoders, locale-independent IEEE-1284 parsing, raster packing, per-page PCL framing, printer status, copies, cancellation, overlapping jobs, lock release, offline file export, transparency/dithering and margin clipping. Raster/lifecycle tests run on simulated APIs 28 and 36.
 
+The reported `CID:CA_UFRIILT_OIP;CMD:LIPSLX,CPCA` identity is covered explicitly, including correct diagnostics and continued rejection of unsupported Canon USB output. The research SLIM codec is checked against 60 golden vectors independently decoded by Canon's `lCaptDecode`. A separate CI job runs that external oracle and generates NCAP page-filter output without a session. These checks establish raster-byte validity only; see tools/canon/README.md.
+
 Native PDF tests run on an Android emulator/device: PDF snapshots, concurrent previews, original-file removal, physical-size/landscape rendering, duplicate ownership, malformed-file cleanup, bounded incremental PDF export and actual exported-page rendering. Robolectric's native PDF stubs do not establish native PdfRenderer correctness, so these tests belong in androidTest.
 
 Compose device tests exercise launch/preview, language toggling, disabled USB output without permission, diagnostics, offline PCL generation and terminal dialog dismissal. GitHub Actions runs the host checks and API 35 device tests and saves reports.

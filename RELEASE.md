@@ -5,7 +5,7 @@ This is a testing candidate. Do not publish it as a working Canon LBP6030 direct
 ## Artifacts and identity
 
 - Application ID remains `com.aistudio.lbpotgprint.kxvlzp` to preserve the repository's identity.
-- Candidate: version code 2, version name 1.1.0-rc1; Android 8.0+, target SDK 36.
+- Candidate: version code 3, version name 1.1.0-rc2; Android 8.0+, target SDK 36. This adds correct Canon CID/version diagnostics and a research-only raster codec, not Canon USB printing.
 - The downloadable candidate APK is an optimized, non-debuggable release build signed with a newly generated **candidate testing certificate**. That certificate is not an existing Play upload key. Devices with an earlier APK signed by another certificate require uninstalling it before installing this candidate; uninstall removes app data.
 - `app-release.aab` is unsigned unless the release-signing environment is supplied. Preserve the owner-controlled production upload key and enable Play App Signing. Never commit keys or passwords.
 

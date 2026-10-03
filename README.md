@@ -4,6 +4,8 @@ Native Android utility for opening PDFs and images, saving PDFs through Android'
 
 **Release status: candidate for testing, not a validated Canon LBP6030 driver.** The original AI-generated CARPS2/UFRII LT commands were fabricated. They have been removed. Detecting a Canon printer does not mean the app can print to it. The LBP6030/6040/6018L family needs a genuine, compatible driver and physical validation before it can be supported.
 
+For the reported `04A9:2795`, `CID:CA_UFRIILT_OIP`, `CMD:LIPSLX,CPCA` device, the missing backend is now identified as Canon UFRII LT / NCAP, including its CPCA session layer. Canon's official Linux driver has been obtained and an offline reference harness plus a decoder-validated portable SLIM raster component are included. That component is not a complete USB driver and is not connected to the Print button. See [driver findings](DRIVER_RESEARCH.md) and [reference tooling](tools/canon/README.md).
+
 ## Use
 
 1. Choose a PDF, photo, or the built-in test page.

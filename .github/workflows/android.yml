@@ -10,6 +10,26 @@ concurrency:
 permissions:
   contents: read
 jobs:
+  canon-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install offline reference harness dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ghostscript libcups2-dev gcc
+      - name: Verify SLIM vectors through Canon's decoder
+        run: python3 tools/canon/reference_driver.py verify-slim --work-dir "$RUNNER_TEMP/canon-reference"
+      - name: Generate NCAP PDL reference without a printer session
+        run: python3 tools/canon/reference_driver.py generate --work-dir "$RUNNER_TEMP/canon-reference"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: canon-reference-results
+          path: |
+            ${{ runner.temp }}/canon-reference/slim-oracle-results.json
+            ${{ runner.temp }}/canon-reference/reference-manifest.json
+            ${{ runner.temp }}/canon-reference/reference-ncap-pdl.prn
   verify:
     runs-on: ubuntu-latest
     steps:

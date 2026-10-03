@@ -1,5 +1,6 @@
 *.iml
 .gradle
+__pycache__/
 .kotlin
 /local.properties
 /.idea/caches

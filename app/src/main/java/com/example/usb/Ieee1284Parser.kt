@@ -9,6 +9,15 @@ data class Ieee1284DeviceId(
     val description: String = "",
     val rawKeyValues: Map<String, String> = emptyMap()
 ) {
+    val compatibilityId: String get() = rawKeyValues["CID"].orEmpty()
+
+    // Identifies a backend requirement, not an installed/working driver.
+    val identifiesCanonUfriiLt: Boolean
+        get() = compatibilityId.equals("CA_UFRIILT_OIP", ignoreCase = true)
+
+    val advertisesCpca: Boolean
+        get() = commandSet.any { it.equals("CPCA", ignoreCase = true) }
+
     val supportsPcl5: Boolean
         get() = commandSet.any { it.uppercase(java.util.Locale.ROOT) in setOf("PCL", "PCL5", "PCL5E", "PCL5C", "PCL 5", "PCL 5E", "PCL 5C") }
 
@@ -16,7 +25,7 @@ data class Ieee1284DeviceId(
         get() = commandSet.any { it.contains("CARPS", ignoreCase = true) }
         
     val supportsUfrii: Boolean
-        get() = commandSet.any { it.contains("UFR", ignoreCase = true) }
+        get() = identifiesCanonUfriiLt || commandSet.any { it.contains("UFR", ignoreCase = true) }
 }
 
 object Ieee1284Parser {
