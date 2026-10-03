@@ -65,7 +65,8 @@ class LbpPrintService : PrintService() {
                     val done = CompletableDeferred<PrintJobState>()
                     manager.startPrintJob(source!!, settings) { done.complete(it) }
                     when (val result = done.await()) {
-                        is PrintJobState.Completed -> job.complete() // Delivery completed; USB cannot confirm physical output.
+                        is PrintJobState.Completed -> job.fail("Unexpected file-export result")
+                        is PrintJobState.TransferComplete -> job.block("USB transfer complete; printer acceptance unconfirmed. Check the printer before resubmitting.")
                         is PrintJobState.Cancelled -> job.cancel()
                         is PrintJobState.Failed -> job.fail(result.reason)
                         else -> job.fail("Unexpected job state")

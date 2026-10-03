@@ -30,4 +30,14 @@ class AppFlowTest {
         compose.onNodeWithTag("android_print_button").assertIsEnabled()
     }
 
+    @Test fun diagnosticsOffersRawPrnAndOptInBinaryCapture() {
+        compose.waitUntil(20000) { compose.onAllNodesWithTag("preview_image").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("appbar_diagnostics_button").performClick()
+        compose.onNodeWithTag("raw_prn_button").assertIsEnabled()
+        compose.onNodeWithTag("export_protocol_button").assertIsEnabled()
+        compose.onNodeWithTag("binary_capture_checkbox").assertIsOff().performClick().assertIsOn()
+        compose.onNodeWithContentDescription("Close").performClick()
+        compose.onNodeWithTag("print_button").assertIsEnabled()
+    }
+
 }

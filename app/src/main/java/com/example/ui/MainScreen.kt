@@ -49,6 +49,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -81,6 +82,14 @@ fun MainScreen(viewModel: MainViewModel, onSystemPrint: (com.example.document.Do
     val settings by viewModel.printSettings.collectAsState()
     val currentJob by viewModel.currentJob.collectAsState()
     val showDiagnostics by viewModel.showDiagnosticsSheet.collectAsState()
+    val rawJob by viewModel.rawPrinterJob.collectAsState()
+    val binaryCapture by viewModel.binaryCapture.collectAsState()
+    val protocolCapture by viewModel.printJobManager.lastProtocolCapture.collectAsState()
+    val protocolText=protocolCapture?.snapshot?.collectAsState()?.value ?: "No captured job"
+    var showRawConfirmation by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val rawPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if(uri!=null) { viewModel.importRawPrinterJob(uri);showRawConfirmation=true }
+    }
     val traceLogs by viewModel.traceLogs.collectAsState()
     val isSafeProbing by viewModel.isSafeProbing.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
@@ -361,7 +370,26 @@ fun MainScreen(viewModel: MainViewModel, onSystemPrint: (com.example.document.Do
                     onSafeProbe = { viewModel.runSafeProbe() },
                     onCopyDiagnostics = { viewModel.copyDiagnostics() },
                     onExportReport = { asJson -> viewModel.shareDiagnosticsReport(asJson) },
-                    onClearLogs = { viewModel.clearTraceLogs() }
+                    onClearLogs = { viewModel.clearTraceLogs() },
+                    onSelectRawPrn = { rawPicker.launch(arrayOf("application/octet-stream","application/vnd.hp-PCL","*/*")) },
+                    onExportProtocol = { viewModel.exportProtocolCapture() },
+                    binaryCapture=binaryCapture,
+                    onBinaryCapture={ viewModel.setBinaryCapture(it) },
+                    protocolSummary="State: ${currentJob?.state}\n"+protocolText,
+                    isPrinting=isPrinting
+                )
+            }
+
+            if(showRawConfirmation && rawJob!=null) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest={ showRawConfirmation=false },
+                    title={ Text("Send untouched Canon PRN") },
+                    text={ androidx.compose.foundation.lazy.LazyColumn { item {
+                        val fingerprint=rawJob!!.fingerprint
+                        Text("${rawJob!!.name}\nBytes: ${fingerprint.size}\nSHA-256: ${fingerprint.sha256}\nFirst 64: ${fingerprint.first64Hex}\nLast 64: ${fingerprint.last64Hex}\n\nNo encoding or byte transformation. USB MLP framing only. File authenticity and physical output are unverified.")
+                    } } },
+                    confirmButton={ Button(onClick={ showRawConfirmation=false;viewModel.startRawPrinterJob() },enabled=!isPrinting,modifier=Modifier.testTag("confirm_raw_prn")) { Text("Send via USB") } },
+                    dismissButton={ OutlinedButton(onClick={ showRawConfirmation=false }) { Text("Cancel") } }
                 )
             }
 

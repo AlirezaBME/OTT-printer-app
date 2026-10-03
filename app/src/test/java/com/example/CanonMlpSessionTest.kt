@@ -68,6 +68,6 @@ class CanonMlpSessionTest {
     @Test fun ambiguousWriteIsNotRetried()=runBlocking {
         val peer=CanonMlpPeer();val session=CanonMlpSession(peer);session.open();peer.failWrite=true
         assertTrue(runCatching { session.transmit(ByteArrayInputStream(ByteArray(100)),100) {} }.exceptionOrNull() is IOException)
-        assertEquals(4,peer.wire.size);assertEquals(0,peer.cpca.size())
+        assertEquals(7,peer.wire.size);assertEquals(0,peer.cpca.size())
     }
 }

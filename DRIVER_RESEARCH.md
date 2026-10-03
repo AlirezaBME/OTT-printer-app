@@ -1,6 +1,6 @@
 # Driver findings
 
-The original AI-generated claims of a “genuine CARPS2” and “UFRII LT” implementation were unsupported. The invented encoders have been removed. A complete independent NCAP/CPCA print-stream backend now exists for the reported LBP6030 identity. Software encoding is verified against the official driver; physical output remains unverified. rc3 and rc4 were tested by the owner and produced no paper.
+The original AI-generated claims of a “genuine CARPS2” and “UFRII LT” implementation were unsupported. The invented encoders have been removed. An experimental independent NCAP/CPCA print-stream backend exists for the reported LBP6030 identity. Software encoding is verified against the official driver; physical output remains unverified. rc3, rc4 and rc5 were tested by the owner and produced no paper. See [rc6 isolation audit](CANON_ISOLATION.md).
 
 References inspected on 2026-10-02:
 
@@ -66,7 +66,7 @@ The owner's rc4 trace reports 8,895,951 bytes accepted by raw USB, with no paper
 
 ## Remaining hardware/release acceptance
 
-No successful physical print or bidirectional hardware trace is available in this workspace. Validate the rc5 testing APK on the reported phone/printer: one built-in page, a multi-page PDF, image, each supported media/orientation, copies/ranges, denied permission, paper-out, disconnect, cancellation and reconnect. Compare output placement/density and actual printer acceptance. Physical output cannot be inferred solely from an accepted bulk write, native decoder success or matching packet builders.
+No successful physical print or bidirectional hardware trace is available in this workspace. Validate the rc6 raw PRN isolation APK on the reported phone/printer: one built-in page, a multi-page PDF, image, each supported media/orientation, copies/ranges, denied permission, paper-out, disconnect, cancellation and reconnect. Compare output placement/density and actual printer acceptance. Physical output cannot be inferred solely from an accepted bulk write, native decoder success or matching packet builders.
 
 For a Linux reference capture, locate the USB bus with `lsusb -t`, enable `usbmon`, capture that bus with Wireshark or `tcpdump -i usbmonBUS -s 0 -w canon-test.pcap`, and print one known page through Canon's official queue. Keep both Bulk OUT and Bulk IN traffic and note the printer/driver version and paper result. The offline recorder manifest explicitly states `recordedBeforeTransport=true` and `physicalPrintVerified=false`.
 

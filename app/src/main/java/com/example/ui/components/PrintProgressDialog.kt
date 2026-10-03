@@ -47,7 +47,7 @@ fun PrintProgressDialog(
     if (job == null || job.state is PrintJobState.Idle) return
 
     val state = job.state
-    val isFinished = state is PrintJobState.Completed || state is PrintJobState.Failed || state is PrintJobState.Cancelled
+    val isFinished = state is PrintJobState.TransferComplete || state is PrintJobState.Completed || state is PrintJobState.Failed || state is PrintJobState.Cancelled
 
     AlertDialog(
         onDismissRequest = {
@@ -87,10 +87,11 @@ fun PrintProgressDialog(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = when (state) {
-                        is PrintJobState.Completed -> AppText.t(isPersian, "داده‌های چاپ آماده شد", "Print data ready")
+                        is PrintJobState.Completed -> AppText.t(isPersian, "فایل ذخیره شد", "File saved")
+                        is PrintJobState.TransferComplete -> AppText.t(isPersian, "ارسال USB پایان یافت؛ چاپ تأیید نشده", "Transport complete — print unconfirmed")
                         is PrintJobState.Failed -> AppText.t(isPersian, "خطا در چاپ", "Print Job Failed")
                         is PrintJobState.Cancelled -> AppText.t(isPersian, "چاپ لغو شد", "Print Job Cancelled")
-                        else -> AppText.t(isPersian, "در حال ارسال به چاپگر", "Printing Document")
+                        else -> AppText.t(isPersian, "در حال ارسال به چاپگر", "Preparing / sending job")
                     },
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold
@@ -151,9 +152,9 @@ fun PrintProgressDialog(
 
                     is PrintJobState.DataSent -> {
                         Text(
-                            text = AppText.t(isPersian, "تمام بایت‌ها به بافر چاپگر منتقل شدند. در حال دریافت تاییدیه...", "All bytes transferred to printer buffer. Processing..."),
+                            text = AppText.t(isPersian, "ارسال USB پایان یافت. پذیرش کار و چاپ فیزیکی هنوز نامشخص است.", "USB transport complete. Printer acceptance and processing are unknown."),
                             fontSize = 14.sp,
-                            color = StatusGreen
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -161,13 +162,24 @@ fun PrintProgressDialog(
 
                     is PrintJobState.Finishing -> {
                         Text(
-                            text = "${AppText.t(isPersian, "اتمام چاپ و خروج کاغذ", "Finishing and paper eject")}: ${state.message}",
+                            text = "${AppText.t(isPersian, "پایان ارسال", "Finishing transport")}: ${state.message}",
                             fontSize = 14.sp
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     }
 
+                    is PrintJobState.ObservingPrinter -> {
+                        Text(state.message)
+                        Text("Observation remaining: ${(state.remainingMs+999)/1000}s. READY is port status, not job completion.")
+                        LinearProgressIndicator(modifier=Modifier.fillMaxWidth())
+                    }
+                    is PrintJobState.TransferComplete -> {
+                        Text("USB transfer complete. Printer job acceptance, processing and physical printing remain UNKNOWN.")
+                        Spacer(modifier=Modifier.height(8.dp))
+                        Text("Observation: ${state.printerObservation}\nBytes: ${state.totalBytes}\nPages processed: ${if(state.pagesProcessed==0) "unknown (raw PRN)" else state.pagesProcessed}\nDuration: ${state.durationMs/1000}s")
+                        Text("Export the session trace from diagnostics. Check the printer before sending again.")
+                    }
                     is PrintJobState.Completed -> {
                         Text(AppText.t(isPersian,
                             if (job.settings.driverType == com.example.core.model.DriverType.FILE_STREAM_DUMP) "فایل ذخیره شد. هیچ داده‌ای به چاپگر ارسال نشد." else "داده‌ها ارسال شدند. چاپ فیزیکی از طریق USB قابل تأیید نیست؛ صفحات چاپگر را بررسی کنید.",
