@@ -62,7 +62,7 @@ class CanonUsbJobTest {
     @Test fun autoCanonJobTransmitsExactSpoolAndCopiesThroughUsb() = runBlocking {
         val app=ApplicationProvider.getApplicationContext<LbpOtgApplication>()
         val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
-        val transport=FakeUsbTransport()
+        val transport=CanonMlpPeer()
         val repository=repository(scope,transport)
         val source=Source();val done=CompletableDeferred<PrintJobState>()
         val manager=PrintJobManager(app,repository,scope)
@@ -71,7 +71,7 @@ class CanonUsbJobTest {
         assertTrue("$result",result is PrintJobState.Completed)
         assertEquals(2,source.rendered)
         assertEquals(2,(result as PrintJobState.Completed).pagesPrinted)
-        val bytes=transport.getCapturedBytes()
+        val bytes=transport.cpca.toByteArray()
         assertTrue(bytes.size > 1000000)
         assertArrayEquals(byteArrayOf(0xcd.toByte(),0xca.toByte(),0x10,0),bytes.take(4).toByteArray())
         val file=manager.lastCapturedStreamFile.value!!
@@ -89,6 +89,21 @@ class CanonUsbJobTest {
         assertEquals(2,counts)
         assertFalse(transport.isConnected());assertFalse(repository.operationMutex.isLocked)
         file.delete();scope.cancel()
+    }
+
+    @Test fun missingCanonHandshakeFailsBeforeRenderingAndReleasesUsb() = runBlocking {
+        val app=ApplicationProvider.getApplicationContext<LbpOtgApplication>()
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
+        val peer=CanonMlpPeer().apply { missingReplies=true }
+        val repository=repository(scope,peer)
+        val source=Source();val done=CompletableDeferred<PrintJobState>()
+        val manager=PrintJobManager(app,repository,scope)
+        manager.startPrintJob(source,settings()) { done.complete(it) }
+        val result=withTimeout(20000) { done.await() }
+        assertTrue(result is PrintJobState.Failed);assertEquals(0,source.rendered)
+        assertEquals(1,peer.wire.size);assertEquals(0,peer.cpca.size())
+        assertFalse(peer.isConnected());assertFalse(repository.operationMutex.isLocked)
+        assertNull(manager.lastCapturedStreamFile.value);scope.cancel()
     }
 
     @Test fun paperOutStopsCanonBeforeRenderingOrTransmission() = runBlocking {

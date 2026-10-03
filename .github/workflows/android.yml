@@ -30,6 +30,8 @@ jobs:
         run: python3 tools/canon/reference_driver.py generate --work-dir "$RUNNER_TEMP/canon-reference"
       - name: Compare CPCA messages and NCAP framing against the official driver
         run: python3 tools/canon/reference_driver.py verify-protocol --work-dir "$RUNNER_TEMP/canon-reference"
+      - name: Verify actual Canon transport selection and USB MLP packets
+        run: python3 tools/canon/reference_driver.py verify-mlp --work-dir "$RUNNER_TEMP/canon-reference"
       - name: Decode complete Android Canon jobs and compare every pixel
         run: python3 tools/canon/reference_driver.py verify-jobs --work-dir "$RUNNER_TEMP/canon-reference" --jobs-dir "$RUNNER_TEMP/canon-android-jobs"
       - uses: actions/upload-artifact@v4
@@ -41,6 +43,8 @@ jobs:
             ${{ runner.temp }}/canon-reference/reference-ncap-pdl.prn
             ${{ runner.temp }}/canon-reference/reference-cpca-job.prn
             ${{ runner.temp }}/canon-reference/protocol-oracle-results.json
+            ${{ runner.temp }}/canon-reference/mlp-oracle-results.json
+            ${{ runner.temp }}/canon-reference/mlp-selection.log
             ${{ runner.temp }}/canon-reference/android-jobs-oracle-results.json
   verify:
     runs-on: ubuntu-latest

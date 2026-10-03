@@ -4,9 +4,12 @@
 #define CANON_SESSION_CAPTURE
 #include "pathmap.c"
 
+// The selection oracle retains real initialization and stubs only external I/O.
+#ifndef CANON_RECORD_REAL_INITIALIZATION
 void *Info_Initialize_FilterCalled(const char *root, const char *queue, const char *mode, int flags) {
     return (void *)1;
 }
+#endif
 long Info_commJobWrite(void *handle, const void *data, unsigned long *length) {
     const char *path = getenv("CANON_CPCA_CAPTURE");
     if (!path || !length || *length > 65556) return -1;
