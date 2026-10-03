@@ -27,6 +27,56 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val allDevices = usbRepository.allDevices
     val currentJob = printJobManager.currentJob
     val isPrinting = printJobManager.isBusy
+    private val _rawPrinterJob=MutableStateFlow<RawPrnPrintSource?>(null)
+    val rawPrinterJob=_rawPrinterJob.asStateFlow()
+    private val _binaryCapture=MutableStateFlow(false)
+    val binaryCapture=_binaryCapture.asStateFlow()
+    private var rawImportJob: Job?=null
+    private var rawImportGeneration=0
+    fun setBinaryCapture(enabled: Boolean) { if(!isPrinting.value) { _binaryCapture.value=enabled;printJobManager.captureBinary=enabled } }
+    fun importRawPrinterJob(uri: Uri) {
+        if(isPrinting.value) return
+        _rawPrinterJob.value?.close();_rawPrinterJob.value=null
+        val generation=++rawImportGeneration
+        rawImportJob?.cancel()
+        rawImportJob=viewModelScope.launch {
+            var imported: RawPrnPrintSource?=null
+            try {
+                withContext(Dispatchers.IO) {
+                    app.contentResolver.openInputStream(uri)?.use { input ->
+                        imported=RawPrnPrintSource.import(input,java.io.File(app.cacheDir,"raw-jobs"),displayName(uri))
+                    } ?: error("Cannot open raw PRN file")
+                }
+                ensureActive()
+                if(generation==rawImportGeneration) { _rawPrinterJob.value?.close();_rawPrinterJob.value=imported;imported=null }
+            } catch(e: CancellationException) { throw e }
+            catch(e: Exception) { reportError(e.message ?: "Raw PRN import failed") }
+            finally { imported?.close() }
+        }
+    }
+    fun startRawPrinterJob() {
+        if(isPrinting.value) return
+        val raw=_rawPrinterJob.value ?: return
+        val device=activeDeviceInfo.value ?: run { reportError("Connect the Canon USB printer first.");return }
+        if(!device.permissionGranted) {
+            usbRepository.requestPermissionForActiveDevice { granted ->
+                if(granted) viewModelScope.launch { usbRepository.awaitRefresh();startRawPrinterJob() }
+                else reportError("USB permission is required.")
+            };return
+        }
+        printJobManager.startRawPrinterJob(raw)
+    }
+    fun exportProtocolCapture() {
+        if(isPrinting.value) { reportError("Wait for the active session to finish.");return }
+        val capture=printJobManager.lastProtocolCapture.value ?: run { reportError("No captured session yet.");return }
+        viewModelScope.launch {
+            try {
+                val zip=java.io.File(app.cacheDir,"exports/session-${capture.directory.name}.zip")
+                withContext(Dispatchers.IO) { zip.parentFile?.mkdirs();capture.export(zip) }
+                diagnosticsRepository.shareFile(app,zip,"application/zip","Export USB protocol session")
+            } catch(e: Exception) { reportError(e.message ?: "Trace export failed") }
+        }
+    }
     val traceLogs = UsbTraceLogger.eventsFlow
     private val preferences = app.getSharedPreferences("preferences", 0)
     private val _isPersian = MutableStateFlow(preferences.getBoolean("persian", java.util.Locale.getDefault().language == "fa"))
@@ -141,7 +191,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         printJobManager.startPrintJob(doc, _printSettings.value) { state ->
             if (state is PrintJobState.Completed) reportError(
                 if (_printSettings.value.driverType == DriverType.FILE_STREAM_DUMP) text("فایل PCL آماده اشتراک‌گذاری است.", "PCL file ready to share.")
-                else text("داده‌ها ارسال شدند. خروجی چاپگر را بررسی کنید.", "Data sent. Check the printer for the printed pages.")
+                else text("پذیرش چاپگر تأیید نشده است.", "Transport complete; printer acceptance unconfirmed.")
             )
         }
     }
@@ -198,6 +248,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val doc = _currentDocument.value
         app.applicationScope.launch {
             printJobManager.cancelAndJoin()
+            rawImportJob?.cancelAndJoin()
+            _rawPrinterJob.value?.close()
             documentMutex.withLock { withContext(Dispatchers.IO) { doc?.close() } }
         }
         super.onCleared()

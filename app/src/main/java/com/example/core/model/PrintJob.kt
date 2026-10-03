@@ -33,9 +33,13 @@ sealed class PrintJobState {
     ) : PrintJobState()
     
     data class Finishing(
-        val message: String = "Waiting for page ejection…"
+        val message: String = "Waiting for printer evidence…"
     ) : PrintJobState()
     
+    data class ObservingPrinter(val message: String, val remainingMs: Long) : PrintJobState()
+    data class TransferComplete(val totalBytes: Long, val pagesProcessed: Int, val durationMs: Long, val printerObservation: String) : PrintJobState()
+
+    /** File export only. USB delivery uses TransferComplete, never Completed. */
     data class Completed(
         val totalBytes: Long,
         val pagesPrinted: Int,

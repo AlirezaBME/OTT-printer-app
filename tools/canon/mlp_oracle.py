@@ -51,7 +51,10 @@ def read(p,b,n,out,t):
 @Q
 def query(p,c,b,n,out,cap,actual,t):
     data=C.string_at(b,n);requests.append(data)
-    reply=bytes([0x81,0,data[1],data[2]])+bytes.fromhex('40004000ffff0001') if data[0]==1 else bytes([0x82,0,data[1],data[2]])
+    if data[0]==1:reply=bytes([0x81,0,data[1],data[2]])+bytes.fromhex('40004000ffff0001')
+    elif data[0]==2:reply=bytes([0x82,0,data[1],data[2]])
+    elif data[0]==0x0a:reply=bytes([0x8a,0,data[1]])+b'CANON_TEST_SERVICE'
+    else:raise AssertionError(data.hex())
     C.memmove(out,reply,len(reply));actual[0]=len(reply);return 0
 fake[2]=C.cast(write,C.c_void_p).value;fake[3]=C.cast(read,C.c_void_p).value;fake[8]=C.cast(query,C.c_void_p).value
 C.c_void_p.from_address(port).value=C.addressof(fake)
@@ -92,6 +95,20 @@ try:
         packet,consumed=serialize(0,requests[-1]);assert consumed==3
         assert packet==bytes.fromhex('000000090100')+bytes([2,host,host*16])
         passed.append({'name':f'close-{host}','wireHex':packet.hex()})
+    std=C.CDLL('libstdc++.so.6')
+    empty=C.addressof((C.c_char*1).in_dll(std,'_ZNSs4_Rep20_S_empty_rep_storageE'))+24
+    for host in range(1,4):
+        C.c_int.from_address(port+0x80).value=1 # GetServiceName runs on the opened CONTROL channel.
+        string=C.c_void_p(empty)
+        method=library._ZN12C_MLCChannel14GetServiceNameEhRSs
+        method.argtypes=[C.c_void_p,C.c_ubyte,C.c_void_p];method.restype=C.c_long
+        assert method(port+0x80,host*16,C.byref(string))==0
+        assert requests[-1]==bytes([0x0a,host*16])
+        assert C.string_at(string.value)==b'CANON_TEST_SERVICE'
+        packet,consumed=serialize(0,requests[-1]);assert consumed==2
+        assert packet==bytes.fromhex('000000080100')+bytes([0x0a,host*16])
+        passed.append({'name':f'service-{host}','wireHex':packet.hex(),'decodedName':'CANON_TEST_SERVICE','actualDeviceService':'UNVERIFIED'})
+        destructor=std._ZNSsD1Ev;destructor.argtypes=[C.c_void_p];destructor(C.byref(string))
     for count in [1,8,64,506,16378,65529]:
         payload=bytes((i*31)&255 for i in range(count))
         packet,consumed=serialize(1,payload)

@@ -16,7 +16,7 @@ import kotlin.math.roundToInt
  */
 class CanonNcapEncoder : PrinterLanguageEncoder {
     override val driverId = "canon_ncap_lbp6030"
-    override val displayName = "Canon LBP6030 · UFRII LT"
+    override val displayName = "Experimental Canon NCAP/CPCA"
     private var pages = 0
     private var encodedPages = 0
     override fun encodeJobStart(settings: PrintSettings, totalPages: Int): ByteArray {

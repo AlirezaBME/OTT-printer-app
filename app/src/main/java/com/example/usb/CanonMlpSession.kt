@@ -4,19 +4,25 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.io.InputStream
 import java.io.IOException
+import java.io.PushbackInputStream
+import com.example.protocol.*
+import com.example.diagnostics.ProtocolCapture
 
 /** Canon USB MLP channel layer, below CPCA. Derived from libcomm_usbmlportr v5.00.
  * Every packet consumes one channel credit; a reply restores it. Keep one packet
  * outstanding, as Canon's library does with its initial credit of one. USB writes
  * are never retried after an ambiguous failure. This does not confirm paper output.
  */
-class CanonMlpSession(private val transport: UsbTransport, private val replyTimeoutMs: Int = 10000) {
+class CanonMlpSession(private val transport: UsbTransport, private val replyTimeoutMs: Int = 10000, private val capture: ProtocolCapture? = null, private val maxPacketSize: Int = 512, private val discoverServices: Boolean = true, private val nanoTime: () -> Long = System::nanoTime) {
+    private val cpca = CanonCpcaSession(capture)
     private var pending = ByteArray(0)
     private val incomingLimits = IntArray(4) { 64 }
     private var outgoingLimit = 0
     private var opened = false
     private var packets = 0L
     private var replies = 0L
+    private var flowReplies = 0L
+    private var wireCredits = 0L
     private var lastReply = "none"
     private val tag = "CanonMlpSession"
 
@@ -34,39 +40,57 @@ class CanonMlpSession(private val transport: UsbTransport, private val replyTime
                 body[2].u() != channel || body[3].u() != channel * 16) {
                 fail("Canon rejected channel $channel", reply)
             }
-            val outSize = be16(body, 4)
-            val inSize = be16(body, 6)
-            if (outSize <= 6 || inSize <= 6) fail("Invalid Canon channel packet sizes", reply)
+            val (outSize,inSize) = CanonMlpProtocol.openSizes(body,channel)
             incomingLimits[channel] = inSize
+            capture?.recordOpenedChannel(CanonMlpProtocol.channels[channel - 1], outSize, inSize)
             if (channel == 1) outgoingLimit = outSize
             UsbTraceLogger.log(tag, "MLP channel $channel/${channel * 16} open: OUT=$outSize IN=$inSize", hexDump = UsbTraceLogger.bytesToHex(reply))
+        }
+        if(discoverServices) {
+            for(channel in CanonMlpProtocol.channels) {
+                send(frame(0,CanonMlpProtocol.serviceRequest(channel.printerSocket)))
+                val response=receiveOn(0,"service lookup ${channel.printerSocket}")
+                val service=CanonMlpProtocol.serviceName(response.copyOfRange(6,response.size),channel.printerSocket)
+                capture?.recordServiceName(channel.hostSocket, service)
+                capture?.event("channelMapping",mapOf("hostSocket" to channel.hostSocket,"printerSocket" to channel.printerSocket,"service" to service,"nativeRole" to channel.nativeRole,"roleEvidence" to "VERIFIED_NATIVE_DRIVER","devicePrintAcceptance" to "UNVERIFIED"))
+                UsbTraceLogger.log(tag,"MLP channel ${channel.hostSocket} service=$service host=${channel.hostSocket} printer=${channel.printerSocket} purpose=${channel.nativeRole} (native driver mapping; job acceptance unknown)")
+            }
         }
         opened = true
     }
 
     suspend fun transmit(input: InputStream, total: Long, onProgress: (Long) -> Unit) {
         check(opened) { "Canon USB channel is not open." }
+        val stream=PushbackInputStream(input,1)
         val buffer = ByteArray((outgoingLimit - 6).coerceAtMost(16378))
+        val digest=java.security.MessageDigest.getInstance("SHA-256")
         var sent = 0L
         while (true) {
             currentCoroutineContext().ensureActive()
-            val size = input.read(buffer)
+            var size = stream.read(buffer,0,CanonMlpProtocol.payloadCount((total-sent).coerceAtMost(Int.MAX_VALUE.toLong()).toInt().coerceAtLeast(1),outgoingLimit,maxPacketSize))
             if (size < 0) break
             if (size == 0) continue
+            if(size>1 && size%maxPacketSize==0) { stream.unread(buffer[size-1].toInt() and 255);size-- }
+            digest.update(buffer,0,size)
             send(frame(1, buffer.copyOf(size)))
             packets++
             // USB accepting bytes is insufficient: require the printer's MLP reply.
             val reply = receiveOn(1, "acknowledging data packet $packets ($sent/$total bytes)")
             replies++
+            if(reply.size==6) flowReplies++
+            wireCredits+=(reply[4].toInt() and 255)
             lastReply = UsbTraceLogger.bytesToHex(reply, 32)
             if (packets == 1L || packets % 64L == 0L) {
-                UsbTraceLogger.log(tag, "MLP data acknowledged: packets=$packets bytes=${sent + size}/$total", hexDump = lastReply)
+                UsbTraceLogger.log(tag, "MLP flow-control replies: packets=$packets bytes=${sent + size}/$total", hexDump = lastReply)
             }
             sent += size
+            capture?.summary?.put("bytesTransmitted", sent)
             onProgress(sent)
         }
         if (sent != total) throw IOException("Canon spool changed while sending: $sent/$total bytes.")
-        UsbTraceLogger.log(tag, "MLP transfer acknowledged: $sent bytes, $packets packets, $replies replies. Last reply: $lastReply")
+        capture?.summary?.put("transmittedJobSha256",digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) })
+        capture?.summary?.put("dataPackets",packets)?.put("flowControlReplies",flowReplies)?.put("nativeFlowTokens",replies)?.put("wireCreditFieldTotal",wireCredits)
+        UsbTraceLogger.log(tag, "Transport complete — printer acceptance UNKNOWN: $sent bytes, $packets packets, $replies replies. Last reply: $lastReply")
     }
 
     suspend fun finish() {
@@ -84,6 +108,13 @@ class CanonMlpSession(private val transport: UsbTransport, private val replyTime
 
     private suspend fun send(bytes: ByteArray) {
         currentCoroutineContext().ensureActive()
+        capture?.event("mlpOut",mapOf("direction" to "OUT","channel" to (bytes[0].toInt() and 255),"printerSocket" to (bytes[1].toInt() and 255),
+            "credit" to (bytes[4].toInt() and 255), "flags" to (bytes[5].toInt() and 255),
+            "headerHex" to UsbTraceLogger.bytesToHex(bytes.copyOfRange(0,6)),"payloadLength" to (bytes.size-6),"frameLength" to bytes.size,
+            "command" to (if(bytes[0]==0.toByte()) bytes.getOrNull(6)?.toInt()?.and(255) else null),
+            "usbWriteCount" to (if(bytes.contentEquals(INIT)) 1 else if(bytes.size>6) 2 else 1),
+            "usbWriteSizes" to (if(bytes.contentEquals(INIT)) listOf(8) else if(bytes.size>6) listOf(6, bytes.size-6) else listOf(6)),"zlpEmitted" to false,
+            "finalTransferAligned" to ((if(bytes.contentEquals(INIT)) 8 else bytes.size-6)%maxPacketSize==0)))
         if (bytes.contentEquals(INIT)) {
             write(bytes)
         } else {
@@ -101,7 +132,7 @@ class CanonMlpSession(private val transport: UsbTransport, private val replyTime
     }
 
     private suspend fun receiveOn(channel: Int, stage: String): ByteArray {
-        val deadline = System.nanoTime() + replyTimeoutMs * 1_000_000L
+        val deadline = nanoTime() + replyTimeoutMs * 1_000_000L
         repeat(128) {
             val response = nextFrame(stage, deadline)
             val id = response[0].u()
@@ -114,7 +145,7 @@ class CanonMlpSession(private val transport: UsbTransport, private val replyTime
         throw IOException("Too many unrelated Canon replies during $stage.")
     }
 
-    private suspend fun nextFrame(stage: String, deadline: Long = System.nanoTime() + replyTimeoutMs * 1_000_000L): ByteArray {
+    private suspend fun nextFrame(stage: String, deadline: Long = nanoTime() + replyTimeoutMs * 1_000_000L): ByteArray {
         while (true) {
             currentCoroutineContext().ensureActive()
             if (pending.size >= 6) {
@@ -126,10 +157,16 @@ class CanonMlpSession(private val transport: UsbTransport, private val replyTime
                 if (pending.size >= size) {
                     val packet = pending.copyOfRange(0, size)
                     pending = pending.copyOfRange(size, pending.size)
+                    val parsed=CanonMlpProtocol.parse(packet,incomingLimits[channel])
+                    capture?.event("mlpIn",mapOf("direction" to "IN","channel" to parsed.channel,"printerSocket" to parsed.printerSocket,"credit" to parsed.credit,
+                        "flags" to parsed.flags,"headerHex" to UsbTraceLogger.bytesToHex(packet.copyOfRange(0,6)),"responseLength" to packet.size,"frameLength" to packet.size,
+                        "payloadLength" to parsed.payload.size,"responseHex" to UsbTraceLogger.bytesToHex(packet,64),
+                        "kind" to if(parsed.isFlowControl) "FLOW_CONTROL" else "PAYLOAD","printerAcceptance" to "UNKNOWN"))
+                    if(channel!=0) cpca.observe(parsed)
                     return packet
                 }
             }
-            val remainingMs = ((deadline - System.nanoTime()) / 1_000_000L).coerceAtMost(replyTimeoutMs.toLong()).toInt()
+            val remainingMs = ((deadline - nanoTime()) / 1_000_000L).coerceAtMost(replyTimeoutMs.toLong()).toInt()
             if (remainingMs <= 0) fail("Canon did not acknowledge $stage before the timeout. Power-cycle the printer and reconnect OTG", pending)
             // Read whole USB packets. A six-byte bulk read can truncate a larger reply.
             val buffer = ByteArray(16384)
@@ -143,6 +180,43 @@ class CanonMlpSession(private val transport: UsbTransport, private val replyTime
         }
     }
 
+    /** Poll only documented USB port status and passive channel replies. A basic
+     * READY byte or MLP credit never establishes CPCA job acceptance/completion.
+     */
+    suspend fun observePrinter(windowMs: Long, interfaceId: Int, onSample: (Long,String)->Unit) {
+        val deadline=nanoTime()+windowMs*1_000_000L
+        require(windowMs in 0..60000)
+        var samples=0
+        while(nanoTime()<deadline) {
+            currentCoroutineContext().ensureActive()
+            if(++samples>128) throw CanonProtocolException("OBSERVING","RESPONSE_LIMIT","Observation sample limit exceeded before the deadline")
+            val remaining=((deadline-nanoTime())/1_000_000).coerceAtLeast(1)
+            onSample(remaining,"Transport complete. Waiting for printer evidence; CPCA job state UNKNOWN.")
+            val status=transport.queryPortStatus(interfaceId).getOrThrow()
+            capture?.event("portStatus",mapOf("rawByte" to status.rawByte,"ready" to status.isReady,"printerJobState" to "UNKNOWN"))
+            if(!status.isReady) throw CanonProtocolException("OBSERVING","PRINTER_PORT_ERROR",status.toDisplayString())
+            if(pending.isEmpty()) {
+                val buffer=ByteArray(16384)
+                val readRemaining=((deadline-nanoTime())/1_000_000).toInt()
+                if (readRemaining <= 0) break
+                val read=transport.readBulk(buffer,minOf(1000,readRemaining))
+                val count=read.getOrNull() ?: 0
+                if(count>0) pending+=buffer.copyOf(count)
+                else {
+                    capture?.event("observationIdle",mapOf("error" to read.exceptionOrNull()?.message,"meaning" to "No job evidence; timeout or I/O remains unclassified until next port query"))
+                    kotlinx.coroutines.yield()
+                    continue
+                }
+            }
+            // Use existing bounded parser and passive CPCA observer. Never infer
+            // acceptance from payload presence without validated command semantics.
+            nextFrame("observing printer",deadline)
+        }
+        capture?.summary?.put("cpcaResponses",cpca.responseCount)?.put("observationOutcome","CONFIRMATION_TIMEOUT")
+        capture?.event("state",mapOf("state" to "CONFIRMATION_TIMEOUT","printerAcceptance" to "UNKNOWN","physicalPrintConfirmed" to false))
+        UsbTraceLogger.log(tag,"Observation ended: CPCA responses=${cpca.responseCount}; printer acceptance, processing and physical completion UNKNOWN.")
+    }
+
     private fun requireReply(packet: ByteArray, channel: Int, body: ByteArray, stage: String) {
         if (packet[0].u() != channel || !packet.copyOfRange(6, packet.size).contentEquals(body)) {
             fail("Unexpected Canon acknowledgement during $stage", packet)
@@ -151,7 +225,8 @@ class CanonMlpSession(private val transport: UsbTransport, private val replyTime
     private fun fail(message: String, bytes: ByteArray): Nothing {
         val hex = UsbTraceLogger.bytesToHex(bytes, 48)
         UsbTraceLogger.log(tag, message, isError = true, hexDump = hex)
-        throw IOException("$message. Reply: ${hex.ifEmpty { "none" }}")
+        val code = if (message.contains("timeout", ignoreCase = true) || message.startsWith("No Canon")) "REPLY_TIMEOUT" else "INVALID_RESPONSE"
+        throw CanonProtocolException("MLP", code, "$message. Reply: ${hex.ifEmpty { "none" }}")
     }
 
     companion object {

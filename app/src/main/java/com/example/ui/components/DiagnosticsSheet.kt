@@ -68,7 +68,13 @@ fun DiagnosticsSheet(
     onSafeProbe: () -> Unit,
     onCopyDiagnostics: () -> Unit,
     onExportReport: (asJson: Boolean) -> Unit,
-    onClearLogs: () -> Unit
+    onClearLogs: () -> Unit,
+    onSelectRawPrn: () -> Unit,
+    onExportProtocol: () -> Unit,
+    binaryCapture: Boolean,
+    onBinaryCapture: (Boolean)->Unit,
+    protocolSummary: String,
+    isPrinting: Boolean
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -160,6 +166,12 @@ fun DiagnosticsSheet(
                     Text(AppText.t(isPersian, "اتصال مجدد", "Reconnect"), fontSize = 12.sp)
                 }
 
+                OutlinedButton(onClick=onSelectRawPrn,enabled=!isPrinting,modifier=Modifier.testTag("raw_prn_button")) { Text("Print raw Canon PRN") }
+                OutlinedButton(onClick=onExportProtocol,enabled=!isPrinting,modifier=Modifier.testTag("export_protocol_button")) { Text("Export session trace ZIP") }
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    androidx.compose.material3.Checkbox(checked=binaryCapture,onCheckedChange=onBinaryCapture,enabled=!isPrinting,modifier=Modifier.testTag("binary_capture_checkbox"))
+                    Text("Capture binary job + USB bytes (up to 64 MB; contains document data)",fontSize=12.sp)
+                }
                 OutlinedButton(onClick = onClearLogs) {
                     Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(4.dp))
@@ -175,6 +187,11 @@ fun DiagnosticsSheet(
                     .weight(1f)
                     .fillMaxWidth()
             ) {
+                item {
+                    Text("Protocol debugging: printer acceptance is UNKNOWN until verified job status exists.",fontSize=12.sp)
+                    Text(protocolSummary,fontFamily=FontFamily.Monospace,fontSize=11.sp)
+                    Text("Service names are queried from the printer. Native channel roles are evidence from Canon's driver; CPCA job-status meanings remain unverified.",fontSize=11.sp)
+                }
                 // USB Hardware Descriptor Card
                 item {
                     Text(
@@ -216,8 +233,8 @@ fun DiagnosticsSheet(
                                     Text("  CID: ${deviceInfo.ieee1284.compatibilityId}", fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                                     if (deviceInfo.ieee1284.identifiesCanonUfriiLt) {
                                         Text(AppText.t(isPersian,
-                                            "درایور Canon UFRII LT / NCAP در برنامه موجود است. خروجی چاپگر را پس از ارسال بررسی کنید.",
-                                            "Canon UFRII LT / NCAP is included. Check the physical output after sending."),
+                                            "رمزگذار آزمایشی NCAP/CPCA؛ پذیرش کار و چاپ فیزیکی هنوز تأیید نشده است.",
+                                            "Experimental NCAP/CPCA encoder: native decoder checked; physical acceptance unverified."),
                                             fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
                                     }
                                     Text("  RAW: ${deviceInfo.ieee1284.rawString}", fontSize = 10.sp, fontFamily = FontFamily.Monospace)

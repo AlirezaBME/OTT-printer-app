@@ -65,12 +65,12 @@ class CanonUsbJobTest {
         val transport=CanonMlpPeer()
         val repository=repository(scope,transport)
         val source=Source();val done=CompletableDeferred<PrintJobState>()
-        val manager=PrintJobManager(app,repository,scope)
+        val manager=PrintJobManager(app,repository,scope,observationMs=0)
         assertTrue(manager.startPrintJob(source,settings().copy(copies=2)) { done.complete(it) })
         val result=withTimeout(60000) { done.await() }
-        assertTrue("$result",result is PrintJobState.Completed)
+        assertTrue("$result",result is PrintJobState.TransferComplete)
         assertEquals(2,source.rendered)
-        assertEquals(2,(result as PrintJobState.Completed).pagesPrinted)
+        assertEquals(2,(result as PrintJobState.TransferComplete).pagesProcessed)
         val bytes=transport.cpca.toByteArray()
         assertTrue(bytes.size > 1000000)
         assertArrayEquals(byteArrayOf(0xcd.toByte(),0xca.toByte(),0x10,0),bytes.take(4).toByteArray())
@@ -97,7 +97,7 @@ class CanonUsbJobTest {
         val peer=CanonMlpPeer().apply { missingReplies=true }
         val repository=repository(scope,peer)
         val source=Source();val done=CompletableDeferred<PrintJobState>()
-        val manager=PrintJobManager(app,repository,scope)
+        val manager=PrintJobManager(app,repository,scope,observationMs=0)
         manager.startPrintJob(source,settings()) { done.complete(it) }
         val result=withTimeout(20000) { done.await() }
         assertTrue(result is PrintJobState.Failed);assertEquals(0,source.rendered)
@@ -112,11 +112,13 @@ class CanonUsbJobTest {
         val transport=FakeUsbTransport(simulatedPortStatus=UsbPrinterPortStatus.fromByte(0x38))
         val repository=repository(scope,transport)
         val source=Source();val done=CompletableDeferred<PrintJobState>()
-        val manager=PrintJobManager(app,repository,scope)
+        val manager=PrintJobManager(app,repository,scope,observationMs=0)
         manager.startPrintJob(source,settings()) { done.complete(it) }
         val result=withTimeout(20000) { done.await() }
         assertTrue(result is PrintJobState.Failed);assertEquals(0,source.rendered)
         assertEquals(0,transport.getCapturedBytes().size)
+        assertEquals("Failed", manager.lastProtocolCapture.value!!.summary.getString("terminalState"))
+        assertTrue(java.io.File(manager.lastProtocolCapture.value!!.directory,"session.json").exists())
         assertFalse(repository.operationMutex.isLocked);scope.cancel()
     }
 
@@ -132,7 +134,7 @@ class CanonUsbJobTest {
             override suspend fun softReset(interfaceIndex: Int): Result<Unit> { resets++;return fake.softReset(interfaceIndex) }
         }
         val repository=repository(scope,transport)
-        val manager=PrintJobManager(app,repository,scope);val done=CompletableDeferred<PrintJobState>()
+        val manager=PrintJobManager(app,repository,scope,observationMs=0);val done=CompletableDeferred<PrintJobState>()
         manager.startPrintJob(Source(),settings()) { done.complete(it) }
         withTimeout(60000) { entered.await() }
         manager.cancelAndJoin()
@@ -141,4 +143,55 @@ class CanonUsbJobTest {
         assertFalse(fake.isConnected());assertFalse(repository.operationMutex.isLocked)
         assertNull(manager.lastCapturedStreamFile.value);scope.cancel()
     }
+    @Test fun rawManagerBypassesRenderingAndExportsExactSourceHash() = runBlocking {
+        val app = ApplicationProvider.getApplicationContext<LbpOtgApplication>()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val peer = CanonMlpPeer(packetSize = 8192)
+        val repository = repository(scope, peer)
+        val bytes = ByteArray(8193) { (it * 37).toByte() }
+        val raw = com.example.document.RawPrnPrintSource.import(bytes.inputStream(), app.cacheDir, "official.prn")
+        val manager = PrintJobManager(app, repository, scope, observationMs = 0)
+        manager.captureBinary = true
+        val done = CompletableDeferred<PrintJobState>()
+        assertTrue(manager.startRawPrinterJob(raw) { done.complete(it) })
+        val result = withTimeout(20000) { done.await() }
+        assertTrue(result is PrintJobState.TransferComplete)
+        assertEquals(0, (result as PrintJobState.TransferComplete).pagesProcessed)
+        assertArrayEquals(bytes, peer.cpca.toByteArray())
+        assertArrayEquals(bytes, manager.lastCapturedStreamFile.value!!.readBytes())
+        val trace = manager.lastProtocolCapture.value!!
+        assertEquals("RAW_PRN", trace.summary.getString("sourceType"))
+        assertEquals(raw.fingerprint.sha256, trace.summary.getString("transmittedJobSha256"))
+        assertFalse(peer.isConnected()); assertFalse(repository.operationMutex.isLocked)
+        raw.close(); manager.lastCapturedStreamFile.value!!.delete(); scope.cancel()
+    }
+
+    @Test fun cancellationDuringObservationClosesUsbWithoutReportingCompletion() = runBlocking {
+        val app = ApplicationProvider.getApplicationContext<LbpOtgApplication>()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val peer = CanonMlpPeer()
+        val waiting = CompletableDeferred<Unit>()
+        var resets = 0
+        val transport = object : UsbTransport by peer {
+            override suspend fun readBulk(buffer: ByteArray, timeoutMs: Int): Result<Int> {
+                if (peer.replies.isEmpty()) { waiting.complete(Unit); awaitCancellation() }
+                return peer.readBulk(buffer, timeoutMs)
+            }
+            override suspend fun softReset(interfaceIndex: Int): Result<Unit> { resets++; return Result.success(Unit) }
+        }
+        val repository = repository(scope, transport)
+        val raw = com.example.document.RawPrnPrintSource.import(byteArrayOf(1, 2, 3).inputStream(), app.cacheDir, "official.prn")
+        val manager = PrintJobManager(app, repository, scope)
+        val done = CompletableDeferred<PrintJobState>()
+        manager.startRawPrinterJob(raw) { done.complete(it) }
+        withTimeout(20000) { waiting.await() }
+        assertTrue(manager.currentJob.value!!.state is PrintJobState.ObservingPrinter)
+        manager.cancelAndJoin()
+        assertTrue(done.await() is PrintJobState.Cancelled)
+        assertEquals(1, resets); assertFalse(peer.isConnected()); assertFalse(repository.operationMutex.isLocked)
+        assertNull(manager.lastCapturedStreamFile.value)
+        assertEquals("Cancelled", manager.lastProtocolCapture.value!!.summary.getString("terminalState"))
+        raw.close(); scope.cancel()
+    }
+
 }

@@ -99,7 +99,7 @@ object DiagnosticReport {
                 sb.append("  CMD: ${activeDevice.ieee1284.commandSet.joinToString(", ")}\n")
                 sb.append("  CID: ${activeDevice.ieee1284.compatibilityId}\n")
                 if (activeDevice.ieee1284.identifiesCanonUfriiLt) {
-                    sb.append("  Backend: Canon UFRII LT / NCAP + CPCA over acknowledged USB MLP. Hardware output requires verification.\n")
+                    sb.append("  Backend: Experimental NCAP/CPCA over USB MLP. Flow-control replies do not confirm job acceptance or physical output.\n")
                 }
                 sb.append("  DES: ${activeDevice.ieee1284.description}\n\n")
             }
@@ -161,6 +161,7 @@ object DiagnosticReport {
             ieee.put("identifiesCanonUfriiLt", dev.ieee1284.identifiesCanonUfriiLt)
             ieee.put("advertisesCpca", dev.ieee1284.advertisesCpca)
             ieee.put("directUsbDriverAvailable", dev.ieee1284.supportsPcl5 || com.example.driver.DriverRegistry.supportsCanon(dev))
+            if (dev.ieee1284.identifiesCanonUfriiLt) ieee.put("canonBackendStatus", "EXPERIMENTAL_PHYSICAL_OUTPUT_UNVERIFIED")
             val cmds = JSONArray()
             dev.ieee1284.commandSet.forEach { cmds.put(it) }
             ieee.put("commandSet", cmds)

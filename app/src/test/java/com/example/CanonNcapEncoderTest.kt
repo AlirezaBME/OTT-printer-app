@@ -136,6 +136,10 @@ class CanonNcapEncoderTest {
             val settings=PrintSettings(paperSize=paper,quality=if(dpi==600)PrintQuality.NORMAL_600DPI else PrintQuality.DRAFT_300DPI)
             val encoder=CanonNcapEncoder()
             val job=encoder.encodeJobStart(settings,1)+encoder.encodePage(raster,1,1,settings)+encoder.encodeJobEnd()
+            if (paper == PaperSize.A5 && !landscape && dpi == 300) {
+                val sha = java.security.MessageDigest.getInstance("SHA-256").digest(job).joinToString("") { "%02x".format(it.toInt() and 255) }
+                assertEquals("Deterministic A5 source fixture", "87d7748ea9d3120400e86af6f85e5e5eba6c7c614a3255f3190dbe2678d01998", sha)
+            }
             val pieces=packets(job)
             assertTrue(job.size <= paper.getPixelWidth(600)*paper.getPixelHeight(600)*3/8+200000)
             val pdl=ByteArrayOutputStream()

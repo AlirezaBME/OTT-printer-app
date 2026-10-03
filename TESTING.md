@@ -39,3 +39,9 @@ Use real API 26/28/35/36 phones with USB OTG, the reported Canon LBP6030 `04A9:2
 | Release on 16 KB page-size Android | Startup, imports, exports and printing verified using the optimized APK |
 
 Retain the phone/printer model, OS version, diagnostics report, printed pages/photos and candidate APK SHA-256 for each result. Do not mark milestones as passed without that evidence.
+
+## rc6 isolation milestone
+
+Before changing the encoder again, run the untouched official Windows Canon PRN procedure in [CANON_ISOLATION.md](CANON_ISOLATION.md). Record physical paper output independently from transport replies, with binary capture enabled and the exact imported/transmitted SHA-256. If it prints, compare the generated job language; if it fails, compare MLP/channel/CPCA/USB lifecycle against a successful official-driver USBPcap exchange. Current owner reports establish failure for rc3–rc5, not success for rc6.
+
+Host coverage includes raw spool/transmitted/export byte equality, parser/frame maximums, credit classification, endpoint edge sizes 511/512/513/8186/8192/8193, snapshot mutation, ambiguous write prefix capture, observation timeout/port error, cancellation and ownership cleanup. A stored A5 source-pattern SHA-256 detects encoder drift. Device coverage includes diagnostics raw PRN controls and binary capture opt-in. Neither the native oracle nor the emulator substitutes for an official PRN hardware test.
