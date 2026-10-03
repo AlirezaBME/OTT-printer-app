@@ -69,7 +69,9 @@ class PrintJobManager(private val context: Context, private val usbRepository: U
                     val memory = (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).memoryClass
                     check(settings.quality.dpi <= 300 || memory >= 256) { "Use 300 DPI on this device to avoid running out of memory." }
                     val encoder = DriverRegistry.getEncoder(resolvedDriver)
-                    val canonSession = if (resolvedDriver == DriverType.UFRII_LT) CanonMlpSession(usbRepository.transport) else null
+                    val canonSession = if (resolvedDriver == DriverType.UFRII_LT) {
+                        CanonMlpSession(usbRepository.transport, postJobObservationMs = 1500)
+                    } else null
                     if (canonSession != null) {
                         state(PrintJobState.WaitingForPrinter("Opening Canon USB print channels…"))
                         submissionStarted = true
@@ -110,7 +112,15 @@ class PrintJobManager(private val context: Context, private val usbRepository: U
                                     sent = acknowledged
                                     state(PrintJobState.Sending(sent, total, (sent * 100 / total).toInt()))
                                 }
+                                state(PrintJobState.DataSent(sent, totalSteps))
+                                state(PrintJobState.Finishing("Observing Canon replies before closing USB channels…"))
                                 canonSession.finish()
+                                usbRepository.transport.queryPortStatus(printerInterfaceId).getOrNull()?.let { postStatus ->
+                                    UsbTraceLogger.log(
+                                        "PrintJobManager",
+                                        "Post-job USB printer status: ${postStatus.toDisplayString()} (0x${"%02X".format(postStatus.raw.toInt() and 0xff)})"
+                                    )
+                                }
                             } else {
                                 val buffer = ByteArray(16384)
                                 while (true) {
@@ -124,7 +134,7 @@ class PrintJobManager(private val context: Context, private val usbRepository: U
                                 }
                             }
                         }
-                        UsbTraceLogger.log("PrintJobManager", "Job submitted: driver=${encoder.driverId}, bytes=$sent, pages=$totalSteps. Physical output unconfirmed.")
+                        UsbTraceLogger.log("PrintJobManager", "Job transport completed: driver=${encoder.driverId}, bytes=$sent, pages=$totalSteps. Physical output unconfirmed.")
                     }
                     terminal = PrintJobState.Completed(file.length(), totalSteps, System.currentTimeMillis() - start)
                     _lastCapturedStreamFile.value?.delete()
