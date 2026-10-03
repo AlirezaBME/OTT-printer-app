@@ -12,6 +12,7 @@ import signal
 import struct
 import math
 import tarfile
+import gzip
 import urllib.request
 
 URL = "https://gdlp01.c-wss.com/gds/0/0100005950/10/linux-UFRIILT-drv-v500-uken-18.tar.gz"
@@ -108,13 +109,18 @@ def verify_slim(root):
     # Canon LBP6030 PPD's SLIM settings: 3,9,6,1,0,0,80 (last field is LE16).
     params = (byte * 8)(3, 9, 6, 1, 0, 0, 80, 0)
     passed = 0
-    for line in (HERE / "slim-literal-vectors.tsv").read_text().splitlines():
+    literal_lines = (HERE / "slim-literal-vectors.tsv").read_text().splitlines()
+    copy_lines = gzip.decompress((HERE / "slim-copy-vectors.tsv.gz").read_bytes()).decode().splitlines()
+    for line in literal_lines + copy_lines:
         if not line or line.startswith("#"):
             continue
-        name, stride, rows, depth, raw_hex, encoded_hex = line.split("\t")
+        fields = line.split("\t")
+        name, stride, rows, depth, raw_hex, encoded_hex = fields[:6]
         stride, rows, depth = int(stride), int(rows), int(depth)
         raw, encoded = bytes.fromhex(raw_hex), bytes.fromhex(encoded_hex)
         assert 0 < len(raw) <= 100 * 1024 and len(raw) == stride * rows
+        assert len(encoded) % 4 == 0
+        assert slim_end_code(encoded) == (int(fields[6]) if len(fields) == 7 else 0), name
         incoming = (byte * (len(encoded) + 8)).from_buffer_copy(encoded + bytes(8))
         start = C.cast(incoming, pointer)
         outgoing = (byte * (len(raw) + 16))(*([0xaa] * (len(raw) + 16)))
@@ -125,7 +131,9 @@ def verify_slim(root):
         assert bytes(outgoing[len(raw):]) == bytes([0xaa] * 16), name
         assert 0 <= remaining.value <= 4, (name, remaining.value)
         passed += 1
-    result = {"oracle": "Canon v5.00 lCaptDecode", "driverArchiveSha256": SHA256, "fixturesPassed": passed, "physicalPrintVerified": False}
+    assert passed == 172, ("Missing SLIM fixtures", passed)
+    result = {"oracle": "Canon v5.00 lCaptDecode", "driverArchiveSha256": SHA256, "fixturesPassed": passed,
+              "literalFixturesPassed": 60, "copyFixturesPassed": 112, "physicalPrintVerified": False}
     (root / "slim-oracle-results.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result, indent=2))
 

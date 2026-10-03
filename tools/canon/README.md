@@ -13,7 +13,7 @@ CANON_JOB_OUTPUT=/tmp/canon-android-jobs ./gradlew :app:testDebugUnitTest
 python3 tools/canon/reference_driver.py verify-jobs --work-dir /tmp/canon-reference --jobs-dir /tmp/canon-android-jobs
 ```
 
-`verify-slim` decodes 60 independent literal SLIM fixtures with Canon's native decoder. It verifies every byte, row counts, bounded decoder consumption and output canaries.
+`verify-slim` decodes 172 independent SLIM fixtures (60 literal and 112 row-bounded copy/count/prefix fixtures) with Canon's native decoder. It verifies every byte, row counts, bounded decoder consumption and output canaries.
 
 `generate` uses Ghostscript CUPS raster and the LBP6030 PPD/filter chain to generate NCAP PDL. `pathmap.c` redirects only Canon paths into scratch and disables the session module, so this output is page data only and must not be mistaken for a full USB job.
 
@@ -26,3 +26,10 @@ Results are written as JSON manifests and explicitly carry `physicalPrintVerifie
 `verify-mlp` retains real Info initialization and proves that the LBP6030 PPD selects `multi_usb_ncap` and the USB MLP plugin. It invokes the actual native initialization, channel open/close, packet serializer and receive-credit methods with fake I/O. Nineteen vectors cover three socket pairs, native service-name requests/parsing, packet lengths and credit restoration. Service lookup runs on control channel 0; synthetic oracle names do not establish actual device names. This closes a gap in the older recorder: its replacement of Info initialization concealed the USB layer.
 
 The Android backend wraps the observed inner CPCA stream in Canon USB MLP packets and requires initialization, data and close replies. Interactive CPCA status RPCs are a separate API. The backend does not invent a Bind exchange or treat generic bulk writes as proof of paper output. See [driver findings](../../DRIVER_RESEARCH.md) for physical acceptance criteria.
+
+The rc7 copy fixtures are stored as deterministic gzip TSV (mtime zero). They
+use LBP6030 parameters, depth 2, and a separate last-band column. Kotlin tests
+compare emitted bytes against these fixtures; native `lCaptDecode` compares
+the decoded source directly. Three identical preceding bytes are required
+for the default copy distance of three; row boundaries are never crossed.
+See [repository/license decisions](../../REPOSITORY_REUSE.md).

@@ -1,6 +1,6 @@
 # Driver findings
 
-The original AI-generated claims of a “genuine CARPS2” and “UFRII LT” implementation were unsupported. The invented encoders have been removed. An experimental independent NCAP/CPCA print-stream backend exists for the reported LBP6030 identity. Software encoding is verified against the official driver; physical output remains unverified. rc3, rc4 and rc5 were tested by the owner and produced no paper. See [rc6 isolation audit](CANON_ISOLATION.md).
+The original AI-generated claims of a “genuine CARPS2” and “UFRII LT” implementation were unsupported. The invented encoders have been removed. An experimental independent NCAP/CPCA print-stream backend exists for the reported LBP6030 identity. Software encoding is verified against the official driver; physical output remains unverified. rc3, rc4, rc5 and rc6 were tested by the owner and produced no paper. See [rc6 isolation audit](CANON_ISOLATION.md).
 
 References inspected on 2026-10-02:
 
@@ -66,8 +66,31 @@ The owner's rc4 trace reports 8,895,951 bytes accepted by raw USB, with no paper
 
 ## Remaining hardware/release acceptance
 
-No successful physical print or bidirectional hardware trace is available in this workspace. Validate the rc6 raw PRN isolation APK on the reported phone/printer: one built-in page, a multi-page PDF, image, each supported media/orientation, copies/ranges, denied permission, paper-out, disconnect, cancellation and reconnect. Compare output placement/density and actual printer acceptance. Physical output cannot be inferred solely from an accepted bulk write, native decoder success or matching packet builders.
+No successful physical print or bidirectional hardware trace is available in this workspace. Validate the current raw PRN isolation APK on the reported phone/printer: one built-in page, a multi-page PDF, image, each supported media/orientation, copies/ranges, denied permission, paper-out, disconnect, cancellation and reconnect. Compare output placement/density and actual printer acceptance. Physical output cannot be inferred solely from an accepted bulk write, native decoder success or matching packet builders.
 
 For a Linux reference capture, locate the USB bus with `lsusb -t`, enable `usbmon`, capture that bus with Wireshark or `tcpdump -i usbmonBUS -s 0 -w canon-test.pcap`, and print one known page through Canon's official queue. Keep both Bulk OUT and Bulk IN traffic and note the printer/driver version and paper result. The offline recorder manifest explicitly states `recordedBeforeTransport=true` and `physicalPrintVerified=false`.
 
 The APK remains a testing candidate until physical acceptance is established. Play release additionally needs the owner's stable production/upload signing identity and Play Console configuration.
+
+## Repository review and compatible compression — rc7
+
+[REPOSITORY_REUSE.md](REPOSITORY_REUSE.md) pins all six requested repositories,
+identifies their licenses and records exclusions before code changes. None
+supplies a portable, licensed, complete Canon Android USB driver. The LBP6030
+PPD selects NCAP/SLIM rather than JBIG; CUPS/JBIG dependencies in a Linux package
+do not override the model's selected encoder.
+
+The portable codec now emits an independently implemented copy token only
+when three equal bytes have already been emitted within the row. The native
+model settings select a three-byte backward distance. The CARPS documentation's
+last-byte interpretation failed Canon's decoder and was excluded. The count
+encoding, optional 128-byte-multiple prefix, row boundaries and native final
+band controls are checked by 112 new fixtures plus the 60 retained literal
+fixtures. Complete Kotlin-generated jobs still pass through the independent
+native decoder and every pixel is compared. No GPL C encoder, thermal-printer
+encoding, CUPS daemon or proprietary library is bundled.
+
+Compression reduces unnecessary transport volume and temporary allocation.
+It does not establish that firmware accepts the existing job/session setup.
+The raw official PRN and successful official-driver USB exchange remain the
+isolation ground truth; there is no physical acceptance evidence for rc7.

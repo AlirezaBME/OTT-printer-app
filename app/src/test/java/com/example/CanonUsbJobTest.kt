@@ -72,7 +72,7 @@ class CanonUsbJobTest {
         assertEquals(2,source.rendered)
         assertEquals(2,(result as PrintJobState.TransferComplete).pagesProcessed)
         val bytes=transport.cpca.toByteArray()
-        assertTrue(bytes.size > 1000000)
+        assertTrue("Two compressed A5 copies should stay below the old raw-sized payload", bytes.size in 1..1000000)
         assertArrayEquals(byteArrayOf(0xcd.toByte(),0xca.toByte(),0x10,0),bytes.take(4).toByteArray())
         val file=manager.lastCapturedStreamFile.value!!
         assertEquals("prn",file.extension)

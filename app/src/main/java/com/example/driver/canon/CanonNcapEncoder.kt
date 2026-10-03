@@ -54,7 +54,8 @@ class CanonNcapEncoder : PrinterLanguageEncoder {
         val width = (mediaWidth + 127) / 128 * 128
         val height = (settings.paperSize.heightMm / 25.4 * 600).roundToInt()
         val stride = width / 4
-        val out = ByteArrayOutputStream(stride * height + height * 2)
+        // Compressed text/white bands are small; do not reserve a raw full page.
+        val out = ByteArrayOutputStream(64 * 1024)
         val paper = when (settings.paperSize) { PaperSize.A4 -> 0; PaperSize.A5 -> 0x0b; PaperSize.LETTER -> 2 }
         out.write(hex("02c3")); out.write(paper); out.write(hex("c500c60051f20003e785"))
         out.be16(width); out.be16(height); out.write(hex("de8000c800caa10000cb0061e68002e500"))
@@ -75,7 +76,7 @@ class CanonNcapEncoder : PrinterLanguageEncoder {
                 }
             }
             val lastBand = y + rows == height
-            out.write(band(width, rows, y, CanonSlimRasterCodec.encodeBand(raw, lastBand), lastBand))
+            out.write(band(width, rows, y, CanonSlimRasterCodec.encodeCompressedBand(raw, stride, lastBand), lastBand))
             y += rows
         }
         out.write(hex("1312"))

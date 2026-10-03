@@ -70,3 +70,13 @@ Metadata is bounded at 100,000 events; exceeding it stops the attempt with an ex
 | Raw bytes, edge sizes, timeout, cancellation, cleanup, trace export | Automated tests | Do not substitute these checks for Test A. |
 
 GitHub prerelease includes a signed testing APK, unsigned AAB and reproducible test/oracle reports. Physical acceptance and owner Play signing/Console setup remain required for production publication.
+
+## rc7 compression update
+
+The earlier payload-size analysis above describes rc6 literal coding. rc7
+uses an independently native-validated, row-bounded copy-distance-3 token for
+long constant runs and retains literal coding elsewhere. It preserves NCAP
+headers, CPCA envelopes, final-band controls and the raw PRN bypass. This is a
+software compatibility improvement, not a physical printing confirmation.
+All six requested repositories and licenses were reviewed before application
+changes; see [REPOSITORY_REUSE.md](REPOSITORY_REUSE.md).
