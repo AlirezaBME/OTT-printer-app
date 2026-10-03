@@ -43,6 +43,20 @@ class CanonMlpSessionTest {
         assertEquals(3,peer.wire.count { it[0]==0.toByte() && it[6]==2.toByte() })
     }
 
+    @Test fun largeCpcaPacketMatchesNative8192FragmentBalancing()=runBlocking {
+        val peer=CanonMlpPeer(packetSize=8192)
+        val session=CanonMlpSession(peer)
+        // Total CPCA packet size = 39,598 bytes, matching the native oracle probe.
+        val packet=CanonCpca.packet(0x1a,ByteArray(39578) { (it*13).toByte() })
+        assertEquals(39598,packet.size)
+        session.open()
+        session.transmit(ByteArrayInputStream(packet),packet.size.toLong()) {}
+        session.finish()
+        val sizes=peer.wire.filter { it[0]==1.toByte() }.map { it.size-6 }
+        assertEquals(listOf(8186,8186,8186,7517,7523),sizes)
+        assertArrayEquals(packet,peer.cpca.toByteArray())
+    }
+
     @Test fun postJobObservationCapturesAsynchronousChannelPayloadBeforeClose()=runBlocking {
         UsbTraceLogger.clear()
         val peer=CanonMlpPeer()
