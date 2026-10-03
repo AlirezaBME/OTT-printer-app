@@ -74,7 +74,8 @@ class CanonMlpSession(
             var offset = 0
             while (offset < cpca.size) {
                 currentCoroutineContext().ensureActive()
-                val size = minOf(maxPayload, cpca.size - offset)
+                val remaining = cpca.size - offset
+                val size = nativeFragmentSize(remaining, maxPayload)
                 send(frame(1, cpca.copyOfRange(offset, offset + size)))
                 packets++
 
@@ -291,7 +292,24 @@ class CanonMlpSession(
 
     companion object {
         private const val CPCA_HEADER_BYTES = 20
+        private const val MLP_HEADER_BYTES = 6
         private val CPCA_MAGIC = byteArrayOf(0xcd.toByte(), 0xca.toByte(), 0x10, 0)
+
+        /**
+         * Mirrors Canon v5.00 SendSub2 segmentation observed with an 8192-byte
+         * negotiated packet size. Full-sized frames are used while more than two
+         * payload frames remain. The native library balances the final two payloads
+         * with the six-byte MLP header accounted for in the first split.
+         */
+        internal fun nativeFragmentSize(remaining: Int, maxPayload: Int): Int {
+            require(remaining > 0 && maxPayload > MLP_HEADER_BYTES)
+            if (remaining <= maxPayload) return remaining
+            if (remaining <= maxPayload * 2) {
+                return ((remaining - MLP_HEADER_BYTES) / 2).coerceAtLeast(1)
+            }
+            return maxPayload
+        }
+
         val INIT: ByteArray get() = byteArrayOf(0, 0, 0, 8, 1, 0, 0, 8)
 
         fun openRequest(channel: Int): ByteArray {
