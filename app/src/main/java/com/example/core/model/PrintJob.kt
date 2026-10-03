@@ -33,7 +33,7 @@ sealed class PrintJobState {
     ) : PrintJobState()
     
     data class Finishing(
-        val message: String = "Waiting for page ejection…"
+        val message: String = "Finalizing printer session…"
     ) : PrintJobState()
     
     data class Completed(
