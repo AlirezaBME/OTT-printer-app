@@ -57,39 +57,83 @@ class CanonMlpSession(
 
     suspend fun transmit(input: InputStream, total: Long, onProgress: (Long) -> Unit) {
         check(opened) { "Canon USB channel is not open." }
-        val buffer = ByteArray((outgoingLimit - 6).coerceAtMost(16378))
+        val maxPayload = (outgoingLimit - 6).coerceAtMost(16378)
+        check(maxPayload > 0) { "Canon negotiated an invalid MLP payload size." }
+
         var sent = 0L
+        var cpcaPackets = 0L
         while (true) {
             currentCoroutineContext().ensureActive()
-            val size = input.read(buffer)
-            if (size < 0) break
-            if (size == 0) continue
-            send(frame(1, buffer.copyOf(size)))
-            packets++
+            val cpca = readCpcaPacket(input) ?: break
+            cpcaPackets++
 
-            // This is MLP flow control, not a printer-level "page accepted" response.
-            val reply = receiveOn(1, "restoring flow credit for data packet $packets ($sent/$total bytes)")
-            replies++
-            lastReply = UsbTraceLogger.bytesToHex(reply, 32)
-            if (reply.size > 6) {
-                noteApplicationFrame(reply, "channel-1 reply while restoring flow credit")
+            // Canon's cnpkmodulencapr calls Info_commJobWrite once per complete
+            // CPCA packet. Preserve that boundary on MLP: never pack the tail of
+            // one CPCA packet together with the head of the next. Large CPCA
+            // packets are fragmented only as required by the negotiated MLP size.
+            var offset = 0
+            while (offset < cpca.size) {
+                currentCoroutineContext().ensureActive()
+                val size = minOf(maxPayload, cpca.size - offset)
+                send(frame(1, cpca.copyOfRange(offset, offset + size)))
+                packets++
+
+                // This is MLP flow control, not a printer-level "page accepted" response.
+                val reply = receiveOn(1, "restoring flow credit for MLP packet $packets / CPCA packet $cpcaPackets")
+                replies++
+                lastReply = UsbTraceLogger.bytesToHex(reply, 32)
+                if (reply.size > 6) {
+                    noteApplicationFrame(reply, "channel-1 reply while restoring flow credit")
+                }
+
+                offset += size
+                sent += size
+                if (packets == 1L || packets % 64L == 0L) {
+                    UsbTraceLogger.log(
+                        tag,
+                        "MLP flow credit received: mlpPackets=$packets cpcaPackets=$cpcaPackets bytes=$sent/$total",
+                        hexDump = lastReply
+                    )
+                }
+                onProgress(sent)
             }
-            if (packets == 1L || packets % 64L == 0L) {
-                UsbTraceLogger.log(
-                    tag,
-                    "MLP flow credit received: packets=$packets bytes=${sent + size}/$total",
-                    hexDump = lastReply
-                )
-            }
-            sent += size
-            onProgress(sent)
         }
+
         if (sent != total) throw IOException("Canon spool changed while sending: $sent/$total bytes.")
         UsbTraceLogger.log(
             tag,
-            "MLP transport transfer complete: $sent bytes, $packets packets, $replies flow replies. " +
-                "CPCA/NCAP acceptance and physical output remain unconfirmed. Last reply: $lastReply"
+            "MLP transport transfer complete: $sent bytes, $cpcaPackets CPCA packets, $packets MLP packets, " +
+                "$replies flow replies. CPCA/NCAP acceptance and physical output remain unconfirmed. Last reply: $lastReply"
         )
+    }
+
+    private fun readCpcaPacket(input: InputStream): ByteArray? {
+        val header = ByteArray(CPCA_HEADER_BYTES)
+        var offset = 0
+        while (offset < header.size) {
+            val count = input.read(header, offset, header.size - offset)
+            if (count < 0) {
+                if (offset == 0) return null
+                throw IOException("Truncated Canon CPCA header: $offset/${header.size} bytes.")
+            }
+            if (count == 0) continue
+            offset += count
+        }
+
+        if (!header.copyOfRange(0, 4).contentEquals(CPCA_MAGIC)) {
+            fail("Invalid Canon CPCA packet boundary", header)
+        }
+        val payloadBytes = be16(header, 8)
+        val packet = ByteArray(CPCA_HEADER_BYTES + payloadBytes)
+        header.copyInto(packet)
+        offset = CPCA_HEADER_BYTES
+        while (offset < packet.size) {
+            val count = input.read(packet, offset, packet.size - offset)
+            if (count < 0) throw IOException("Truncated Canon CPCA packet: $offset/${packet.size} bytes.")
+            if (count == 0) continue
+            offset += count
+        }
+        return packet
     }
 
     suspend fun finish() {
@@ -246,6 +290,8 @@ class CanonMlpSession(
     }
 
     companion object {
+        private const val CPCA_HEADER_BYTES = 20
+        private val CPCA_MAGIC = byteArrayOf(0xcd.toByte(), 0xca.toByte(), 0x10, 0)
         val INIT: ByteArray get() = byteArrayOf(0, 0, 0, 8, 1, 0, 0, 8)
 
         fun openRequest(channel: Int): ByteArray {
