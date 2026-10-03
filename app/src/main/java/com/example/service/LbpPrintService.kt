@@ -9,6 +9,7 @@ import android.printservice.PrinterDiscoverySession
 import com.example.LbpOtgApplication
 import com.example.core.model.*
 import com.example.document.PdfDocumentSource
+import com.example.driver.DriverRegistry
 import com.example.jobs.PrintJobManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -104,7 +105,7 @@ class LbpPrintService : PrintService() {
                         probed = device.deviceName
                         repository.safeProbe()
                     }
-                    if (device.ieee1284?.supportsPcl5 != true) { removePrinters(listOf(id)); return@collect }
+                    if (device.ieee1284?.supportsPcl5 != true && !DriverRegistry.supportsCanon(device)) { removePrinters(listOf(id)); return@collect }
                     val capabilities = PrinterCapabilitiesInfo.Builder(id)
                         .addMediaSize(PrintAttributes.MediaSize.ISO_A4, true)
                         .addMediaSize(PrintAttributes.MediaSize.ISO_A5, false)
@@ -114,9 +115,9 @@ class LbpPrintService : PrintService() {
                         .setColorModes(PrintAttributes.COLOR_MODE_MONOCHROME, PrintAttributes.COLOR_MODE_MONOCHROME)
                         .setMinMargins(PrintAttributes.Margins(200, 200, 200, 200)).build()
                     val ready = device.permissionGranted && device.portStatus?.isReady != false
-                    addPrinters(listOf(PrinterInfo.Builder(id, device.productName ?: "USB PCL printer",
+                    addPrinters(listOf(PrinterInfo.Builder(id, device.productName ?: "USB printer",
                         if (ready) PrinterInfo.STATUS_IDLE else PrinterInfo.STATUS_UNAVAILABLE)
-                        .setCapabilities(capabilities).setDescription("USB OTG • PCL 5 monochrome").build()))
+                        .setCapabilities(capabilities).setDescription(if (DriverRegistry.supportsCanon(device)) "USB OTG • Canon UFRII LT" else "USB OTG • PCL 5 monochrome").build()))
                 }
             }
         }

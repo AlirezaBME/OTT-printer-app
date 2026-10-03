@@ -11,10 +11,15 @@ permissions:
   contents: read
 jobs:
   canon-reference:
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: canon-android-jobs
+          path: ${{ runner.temp }}/canon-android-jobs
       - name: Install offline reference harness dependencies
         run: |
           sudo apt-get update -qq
@@ -23,6 +28,10 @@ jobs:
         run: python3 tools/canon/reference_driver.py verify-slim --work-dir "$RUNNER_TEMP/canon-reference"
       - name: Generate NCAP PDL reference without a printer session
         run: python3 tools/canon/reference_driver.py generate --work-dir "$RUNNER_TEMP/canon-reference"
+      - name: Compare CPCA messages and NCAP framing against the official driver
+        run: python3 tools/canon/reference_driver.py verify-protocol --work-dir "$RUNNER_TEMP/canon-reference"
+      - name: Decode complete Android Canon jobs and compare every pixel
+        run: python3 tools/canon/reference_driver.py verify-jobs --work-dir "$RUNNER_TEMP/canon-reference" --jobs-dir "$RUNNER_TEMP/canon-android-jobs"
       - uses: actions/upload-artifact@v4
         with:
           name: canon-reference-results
@@ -30,6 +39,9 @@ jobs:
             ${{ runner.temp }}/canon-reference/slim-oracle-results.json
             ${{ runner.temp }}/canon-reference/reference-manifest.json
             ${{ runner.temp }}/canon-reference/reference-ncap-pdl.prn
+            ${{ runner.temp }}/canon-reference/reference-cpca-job.prn
+            ${{ runner.temp }}/canon-reference/protocol-oracle-results.json
+            ${{ runner.temp }}/canon-reference/android-jobs-oracle-results.json
   verify:
     runs-on: ubuntu-latest
     steps:
@@ -46,6 +58,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - run: ./gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleDebug :app:assembleRelease :app:bundleRelease
+        env:
+          CANON_JOB_OUTPUT: ${{ runner.temp }}/canon-android-jobs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: canon-android-jobs
+          path: ${{ runner.temp }}/canon-android-jobs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

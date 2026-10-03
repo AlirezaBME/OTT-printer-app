@@ -216,8 +216,8 @@ fun DiagnosticsSheet(
                                     Text("  CID: ${deviceInfo.ieee1284.compatibilityId}", fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                                     if (deviceInfo.ieee1284.identifiesCanonUfriiLt) {
                                         Text(AppText.t(isPersian,
-                                            "این چاپگر به درایور Canon UFRII LT نیاز دارد؛ این درایور هنوز در برنامه موجود نیست.",
-                                            "This printer requires Canon UFRII LT; that driver is still unavailable in this app."),
+                                            "درایور Canon UFRII LT / NCAP در برنامه موجود است. خروجی چاپگر را پس از ارسال بررسی کنید.",
+                                            "Canon UFRII LT / NCAP is included. Check the physical output after sending."),
                                             fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
                                     }
                                     Text("  RAW: ${deviceInfo.ieee1284.rawString}", fontSize = 10.sp, fontFamily = FontFamily.Monospace)

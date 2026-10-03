@@ -7,25 +7,27 @@
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-Host tests cover strict/Persian page ranges, settings validation, explicit PCL 5 detection, rejection of unavailable Canon encoders, locale-independent IEEE-1284 parsing, raster packing, per-page PCL framing, printer status, copies, cancellation, overlapping jobs, lock release, offline file export, transparency/dithering and margin clipping. Raster/lifecycle tests run on simulated APIs 28 and 36.
+Host tests cover strict/Persian page ranges, settings validation, explicit PCL 5 detection, rejection of invented CARPS2 and unknown Canon identities, locale-independent IEEE-1284 parsing, raster packing, per-page PCL framing, printer status, copies, cancellation, overlapping jobs, lock release, offline file export, transparency/dithering and margin clipping. Raster/lifecycle tests run on simulated APIs 28 and 36.
 
-The reported `CID:CA_UFRIILT_OIP;CMD:LIPSLX,CPCA` identity is covered explicitly, including correct diagnostics and continued rejection of unsupported Canon USB output. The research SLIM codec is checked against 60 golden vectors independently decoded by Canon's `lCaptDecode`. A separate CI job runs that external oracle and generates NCAP page-filter output without a session. These checks establish raster-byte validity only; see tools/canon/README.md.
+The reported Canon identity is covered explicitly. Tests validate exact model/language selection, CPCA messages against the official module, native NCAP frames, packet length boundaries, incomplete jobs and raster/media validation. Simulated USB tests exercise the actual job manager: Automatic routes Canon without PCL, transmits the exact `.prn` spool, expands copies and emits impression counters, blocks paper-out before rendering, and resets a cancelled partial submission while releasing the USB lock. The portable SLIM codec retains its 60 independently decoded golden vectors.
+
+CI repeats the official-driver oracles, including twelve complete Android-generated A4/A5/Letter portrait/landscape jobs, 2,332 bands, and comparisons of every decoded pixel. See tools/canon/README.md. Software verification does not establish physical printer acceptance.
 
 Native PDF tests run on an Android emulator/device: PDF snapshots, concurrent previews, original-file removal, physical-size/landscape rendering, duplicate ownership, malformed-file cleanup, bounded incremental PDF export and actual exported-page rendering. Robolectric's native PDF stubs do not establish native PdfRenderer correctness, so these tests belong in androidTest.
 
-Compose device tests exercise launch/preview, language toggling, disabled USB output without permission, diagnostics, offline PCL generation and terminal dialog dismissal. GitHub Actions runs the host checks and API 35 device tests and saves reports.
+Compose device tests exercise launch/preview, language toggling, direct USB action reporting missing printer, diagnostics, offline PCL generation and terminal dialog dismissal. GitHub Actions runs the host checks and API 35 device tests and saves reports.
 
 See VERIFICATION.md for the results of this specific candidate, including any test environment limitations. Passing software tests does not establish physical print compatibility.
 
 ## Physical acceptance (required before production claims)
 
-Use real API 26/28/35/36 phones with USB OTG and representative PCL 5 printers. Canon LBP6030 tests cannot proceed until a real Canon backend exists.
+Use real API 26/28/35/36 phones with USB OTG, the reported Canon LBP6030 `04A9:2795`, and representative PCL 5 printers. The rc3 Canon backend can now be submitted for physical acceptance.
 
 | Scenario | Required evidence |
 | --- | --- |
 | Attach and permission grant/deny/reconnect | Correct device selection, no crashes, request cannot be spoofed or overwritten |
 | Safe probe | Correct IEEE-1284 string and status; no transmitted document bytes |
-| PCL test page, text PDF, image | Correct physical page content, media, margins and orientation |
+| Canon/PCL test page, text PDF, image | Correct physical page content, media, margins and orientation |
 | Multi-page PDF and multiple copies | Exact selected pages and copy count in document order |
 | Paper empty, offline or error | Recoverable failure; no false completion |
 | Cable removal during a write | Bounded failure and closed connection; reconnect works |

@@ -28,7 +28,7 @@ class PrintJobManager(private val context: Context, private val usbRepository: U
         if (_isBusy.value) return false
         val indices = try {
             settings.validate()
-            DriverRegistry.getEncoder(settings.driverType)
+            if (settings.driverType == DriverType.CARPS2) DriverRegistry.getEncoder(settings.driverType)
             settings.parsePageIndices(source.totalPages)
         } catch (e: IllegalArgumentException) {
             val failed = PrintJobState.Failed(e.message ?: "Invalid print settings.")
@@ -43,6 +43,8 @@ class PrintJobManager(private val context: Context, private val usbRepository: U
         execution = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             var locked = false
             var spool: File? = null
+            var submissionStarted = false
+            var printerInterfaceId = 0
             var terminal: PrintJobState = PrintJobState.Cancelled()
             val start = System.currentTimeMillis()
             fun state(value: PrintJobState) {
@@ -54,19 +56,19 @@ class PrintJobManager(private val context: Context, private val usbRepository: U
                 withContext(Dispatchers.IO) {
                     check(usbRepository.operationMutex.tryLock()) { "Printer is busy. Try again after the current job." }
                     locked = true
+                    var resolvedDriver = settings.driverType
                     if (settings.driverType != DriverType.FILE_STREAM_DUMP) {
                         state(PrintJobState.WaitingForPrinter("Checking compatibility…"))
                         val info = usbRepository.probeConnectedDevice()
-                        check(info.ieee1284?.supportsPcl5 == true) {
-                            "This printer does not advertise PCL 5. Canon LBP6030 CARPS2/UFRII LT is not supported. Use an Android print service compatible with your printer."
-                        }
+                        resolvedDriver = DriverRegistry.resolve(info, settings.driverType)
+                        printerInterfaceId = info.primaryPrinterInterface?.id ?: 0
                         info.portStatus?.let { check(it.isReady) { it.toDisplayString() } }
                     }
                     val memory = (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).memoryClass
                     check(settings.quality.dpi <= 300 || memory >= 256) { "Use 300 DPI on this device to avoid running out of memory." }
-                    val encoder = DriverRegistry.getEncoder(settings.driverType)
+                    val encoder = DriverRegistry.getEncoder(resolvedDriver)
                     val directory = File(context.cacheDir, "exports").apply { mkdirs() }
-                    spool = File.createTempFile("print_", ".pcl", directory)
+                    spool = File.createTempFile("print_", if (resolvedDriver == DriverType.UFRII_LT) ".prn" else ".pcl", directory)
                     val file = spool!!
                     val totalSteps = indices.size * settings.copies
                     var step = 0
@@ -100,7 +102,8 @@ class PrintJobManager(private val context: Context, private val usbRepository: U
                                 ensureActive()
                                 val size = input.read(buffer)
                                 if (size < 0) break
-                                usbRepository.transport.writeBulk(buffer.copyOf(size), timeoutMs = 3000, chunkSize = 16384).getOrThrow()
+                                submissionStarted = true
+                                usbRepository.transport.writeBulk(buffer.copyOf(size), timeoutMs = if (resolvedDriver == DriverType.UFRII_LT) 15000 else 3000, chunkSize = 16384).getOrThrow()
                                 sent += size
                                 state(PrintJobState.Sending(sent, total, (sent * 100 / total).toInt()))
                             }
@@ -119,7 +122,17 @@ class PrintJobManager(private val context: Context, private val usbRepository: U
                 withContext(NonCancellable) {
                     withContext(Dispatchers.IO) {
                         spool?.delete()
-                        if (locked) { usbRepository.transport.close(); usbRepository.operationMutex.unlock() }
+                        if (locked) {
+                            // A partial job may end inside a length-delimited packet. Reset the
+                            // USB input buffer before another job; never retry ambiguous writes.
+                            try {
+                                if (submissionStarted && terminal !is PrintJobState.Completed) {
+                                    usbRepository.transport.softReset(printerInterfaceId)
+                                }
+                            } finally {
+                                usbRepository.transport.close(); usbRepository.operationMutex.unlock()
+                            }
+                        }
                     }
                     state(terminal)
                     _isBusy.value = false

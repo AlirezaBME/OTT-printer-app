@@ -1,18 +1,20 @@
 # LBP OTG Print
 
-Native Android utility for opening PDFs and images, saving PDFs through Android's print dialog, USB printer diagnostics, and direct monochrome printing to devices that explicitly advertise **PCL 5**.
+Native Android utility for PDF/image printing over USB OTG, Android Print / Save PDF, and USB diagnostics.
 
-**Release status: candidate for testing, not a validated Canon LBP6030 driver.** The original AI-generated CARPS2/UFRII LT commands were fabricated. They have been removed. Detecting a Canon printer does not mean the app can print to it. The LBP6030/6040/6018L family needs a genuine, compatible driver and physical validation before it can be supported.
+**Release status: Canon printing backend implemented and software-verified; physical printer acceptance pending.** Version `1.1.0-rc3` includes an independently implemented Canon UFRII LT / NCAP + CPCA print-stream backend for `04A9:2795`, with `CID:CA_UFRIILT_OIP` and `CMD:LIPSLX,CPCA`. It also supports printers explicitly advertising PCL 5. Other Canon models and CARPS2 are rejected. The invented original encoders remain removed; no Canon proprietary binaries are bundled.
 
-For the reported `04A9:2795`, `CID:CA_UFRIILT_OIP`, `CMD:LIPSLX,CPCA` device, the missing backend is now identified as Canon UFRII LT / NCAP, including its CPCA session layer. Canon's official Linux driver has been obtained and an offline reference harness plus a decoder-validated portable SLIM raster component are included. That component is not a complete USB driver and is not connected to the Print button. See [driver findings](DRIVER_RESEARCH.md) and [reference tooling](tools/canon/README.md).
+Canon's checksum-pinned official driver serves as an offline oracle: all twelve generated A4/A5/Letter portrait/landscape jobs decode correctly through Canon's native decoder, comparing every pixel across 2,332 bands. CPCA setup/footer packets and NCAP framing are compared with official driver output. This validates software serialization, not paper output. No physical printer is attached to the development workspace. See [driver evidence](DRIVER_RESEARCH.md) and [reference tooling](tools/canon/README.md).
 
 ## Use
 
-1. Choose a PDF, photo, or the built-in test page.
-2. Select paper, orientation, scaling, copies, and page ranges. Persian and Arabic digits are accepted.
-3. **Print / Save PDF** opens Android's print dialog. Save as PDF works offline. Physical printing needs an installed service compatible with the destination printer; this does not add Canon USB support.
-4. For a PCL 5 USB printer, connect an OTG cable, grant USB permission, and run the safe probe in Diagnostics. **Send via USB (PCL 5)** checks compatibility again before transmitting.
-5. **Export PCL file** renders a real PCL 5 stream without a printer. Use Share PCL file to export it. “Data sent” is transport delivery, not proof that paper printed.
+1. Connect the printer to the Android phone with an OTG cable. Power it on and load paper.
+2. Choose a PDF, photo, or the built-in test page. Select paper, orientation, copies and page range. Persian and Arabic digits are accepted.
+3. Leave the driver on **Automatic USB driver**. **Print via USB** requests USB permission if needed, probes compatibility/status, renders and submits a Canon or PCL job directly. It does not open Android's print dialog.
+4. **Android print / Save PDF** opens Android's print dialog. Other apps can also use this app's USB print service after it is enabled in Android printing settings and USB permission is granted.
+5. **Export PCL file** produces a PCL stream without a printer. The main button creates the export; **Share print stream** shares the last completed `.pcl` or Canon `.prn` spool.
+
+Canon Draft mode renders at 300 DPI and doubles pixels into the printer's required 600 DPI format. Standard mode renders at 600 DPI. Both use two-bit black/white raster data, correct paper framing and a bounded literal SLIM encoding. This first compatible encoder favors correctness over compression: an A4 draft page is about 9–13 MB. Copies are rendered in order and counted in the CPCA footer. A job cancelled during transfer resets the partial USB input buffer; pages already accepted may still print. “Data sent” confirms transport delivery; inspect the paper result.
 
 Supported input: one PDF or JPEG/PNG/WebP image at a time, up to 64 MB. PDFs can contain up to 10,000 pages. USB jobs are capped at 256 MB. Password-protected, malformed, or inaccessible documents produce a recoverable error and preserve the previous selection. Images are downsampled to a maximum 2048-pixel decoded side to bound memory. PDF 100% scaling uses PDF points; image controls offer Fit and Fill.
 

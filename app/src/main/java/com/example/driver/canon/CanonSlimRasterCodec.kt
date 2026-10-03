@@ -3,10 +3,9 @@ package com.example.driver.canon
 import java.io.ByteArrayOutputStream
 
 /**
- * Research component: encodes the literal subset of Canon SLIM/HISCOA raster bands.
+ * Encodes the literal subset of Canon SLIM/HISCOA raster bands.
  * Independently validated through Canon v5.00's lCaptDecode; see tools/canon/README.md.
- * This is not a printer-language encoder: NCAP page framing and CPCA sessions are absent.
- * DriverRegistry intentionally does not expose it as a working USB driver.
+ * CanonNcapEncoder adds the NCAP band framing and CPCA print-stream envelope.
  */
 object CanonSlimRasterCodec {
     const val MAX_BAND_BYTES = 100 * 1024

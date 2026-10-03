@@ -14,6 +14,9 @@ static const char *map_path(const char *path, char *buffer) {
     const char *root = getenv("CANON_REFERENCE_ROOT");
     if (!path || !root) return path;
     if (!strcmp(path, "/usr/bin/cnrsdrvsfp") ||
+#ifdef CANON_SESSION_CAPTURE
+        !strcmp(path, "/usr/bin/cnpkmodulencapr") ||
+#endif
         !strcmp(path, "/usr/bin/cnjbigsfp") ||
         !strncmp(path, "/usr/share/caepcm", 17) ||
         !strncmp(path, "/usr/share/ncapfilterr", 21) ||
@@ -25,12 +28,14 @@ static const char *map_path(const char *path, char *buffer) {
 }
 
 int execv(const char *path, char *const argv[]) {
+#ifndef CANON_SESSION_CAPTURE
     /* Force the documented no-session fallback even if Canon is installed globally.
        The output is NCAP PDL only, not a captured CPCA/USB print job. */
     if (!strcmp(path, "/usr/bin/cnpkmodulencapr")) {
         errno = ENOENT;
         return -1;
     }
+#endif
     char buffer[PATH_MAX];
     int (*original)(const char *, char *const[]) = dlsym(RTLD_NEXT, "execv");
     return original(map_path(path, buffer), argv);
