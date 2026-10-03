@@ -10,8 +10,8 @@ android {
         applicationId = "com.aistudio.lbpotgprint.kxvlzp"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.1.0-rc3"
+        versionCode = 5
+        versionName = "1.1.0-rc4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     val signingPath = System.getenv("KEYSTORE_PATH")

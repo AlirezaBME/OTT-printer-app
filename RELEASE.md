@@ -5,7 +5,7 @@ This is a testing candidate. The Canon LBP6030 NCAP/CPCA backend is implemented 
 ## Artifacts and identity
 
 - Application ID remains `com.aistudio.lbpotgprint.kxvlzp` to preserve the repository's identity.
-- Candidate: version code 4, version name 1.1.0-rc3; Android 8.0+, target SDK 36. This adds direct Canon USB job generation, automatic driver selection, official-driver oracle tests, and a separate Android print/save action.
+- Candidate: version code 5, version name 1.1.0-rc4; Android 8.0+, target SDK 36. This corrects Canon final-band continuation and SLIM page-end controls omitted by rc3. The official-driver oracle now checks those controls as well as raster pixels.
 - The downloadable candidate APK is an optimized, non-debuggable release build signed with a newly generated **candidate testing certificate**. That certificate is not an existing Play upload key. Devices with an earlier APK signed by another certificate require uninstalling it before installing this candidate; uninstall removes app data.
 - `app-release.aab` is unsigned unless the release-signing environment is supplied. Preserve the owner-controlled production upload key and enable Play App Signing. Never commit keys or passwords.
 

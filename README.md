@@ -2,7 +2,7 @@
 
 Native Android utility for PDF/image printing over USB OTG, Android Print / Save PDF, and USB diagnostics.
 
-**Release status: Canon printing backend implemented and software-verified; physical printer acceptance pending.** Version `1.1.0-rc3` includes an independently implemented Canon UFRII LT / NCAP + CPCA print-stream backend for `04A9:2795`, with `CID:CA_UFRIILT_OIP` and `CMD:LIPSLX,CPCA`. It also supports printers explicitly advertising PCL 5. Other Canon models and CARPS2 are rejected. The invented original encoders remain removed; no Canon proprietary binaries are bundled.
+**Release status: Canon printing backend implemented and software-verified; physical printer acceptance pending.** Version `1.1.0-rc4` corrects the final-band continuation and SLIM page-end controls omitted by rc3's Canon UFRII LT / NCAP + CPCA backend for `04A9:2795`, with `CID:CA_UFRIILT_OIP` and `CMD:LIPSLX,CPCA`. It also supports printers explicitly advertising PCL 5. Other Canon models and CARPS2 are rejected. The invented original encoders remain removed; no Canon proprietary binaries are bundled.
 
 Canon's checksum-pinned official driver serves as an offline oracle: all twelve generated A4/A5/Letter portrait/landscape jobs decode correctly through Canon's native decoder, comparing every pixel across 2,332 bands. CPCA setup/footer packets and NCAP framing are compared with official driver output. This validates software serialization, not paper output. No physical printer is attached to the development workspace. See [driver evidence](DRIVER_RESEARCH.md) and [reference tooling](tools/canon/README.md).
 

@@ -21,7 +21,7 @@ See VERIFICATION.md for the results of this specific candidate, including any te
 
 ## Physical acceptance (required before production claims)
 
-Use real API 26/28/35/36 phones with USB OTG, the reported Canon LBP6030 `04A9:2795`, and representative PCL 5 printers. The rc3 Canon backend can now be submitted for physical acceptance.
+Use real API 26/28/35/36 phones with USB OTG, the reported Canon LBP6030 `04A9:2795`, and representative PCL 5 printers. rc4 fixes page-finalization controls missed by rc3. The oracle now checks both final controls against the complete official filter stream; a two-page regression verifies each page independently.
 
 | Scenario | Required evidence |
 | --- | --- |

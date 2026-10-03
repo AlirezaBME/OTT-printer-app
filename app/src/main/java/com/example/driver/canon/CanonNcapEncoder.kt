@@ -74,22 +74,23 @@ class CanonNcapEncoder : PrinterLanguageEncoder {
                     }
                 }
             }
-            out.write(band(width, rows, y, CanonSlimRasterCodec.encodeBand(raw)))
+            val lastBand = y + rows == height
+            out.write(band(width, rows, y, CanonSlimRasterCodec.encodeBand(raw, lastBand), lastBand))
             y += rows
         }
         out.write(hex("1312"))
         return out.toByteArray()
     }
 
-    internal fun band(width: Int, rows: Int, y: Int, compressed: ByteArray): ByteArray {
-        // SLIM wrapper: eight parameters, normal-band flag, LE32(stream length+4),
+    internal fun band(width: Int, rows: Int, y: Int, compressed: ByteArray, lastBand: Boolean = false): ByteArray {
+        // SLIM wrapper: eight parameters, continuation flag (zero on final band), LE32(stream length+4),
         // the encoded band, and the NCAP terminator. Length excludes the NCAP header.
         val length = compressed.size + 14
         require(length <= 65535 && rows in 1..256 && width in 1..65535 && y in 0..65535)
         return ByteArrayOutputStream(length + 23).apply {
             write(hex("62e385")); be16(width); be16(rows); write(hex("e8a50000")); be16(y)
             write(hex("e103d784")); be16(length); write(0x9d); be16(length)
-            write(hex("030906010000500001"))
+            write(hex("0309060100005000")); write(if (lastBand) 0 else 1)
             val size = compressed.size + 4
             repeat(4) { write(size ushr (8 * it)) }
             write(compressed); write(0x80)
