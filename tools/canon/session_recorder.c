@@ -13,6 +13,19 @@ void *Info_Initialize_FilterCalled(const char *root, const char *queue, const ch
 long Info_commJobWrite(void *handle, const void *data, unsigned long *length) {
     const char *path = getenv("CANON_CPCA_CAPTURE");
     if (!path || !length || *length > 65556) return -1;
+
+    const char *calls = getenv("CANON_CPCA_CALLS");
+    if (calls) {
+        FILE *log = fopen(calls, "a");
+        if (!log) return -1;
+        const unsigned char *bytes = (const unsigned char *)data;
+        fprintf(log, "%lu", *length);
+        unsigned long prefix = *length < 16 ? *length : 16;
+        for (unsigned long i = 0; i < prefix; ++i) fprintf(log, "\t%02x", bytes[i]);
+        fprintf(log, "\n");
+        fclose(log);
+    }
+
     FILE *output = fopen(path, "ab");
     if (!output) return -1;
     size_t written = fwrite(data, 1, *length, output);
