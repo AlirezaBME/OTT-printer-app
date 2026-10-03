@@ -138,7 +138,7 @@ class CanonNcapEncoderTest {
             val job=encoder.encodeJobStart(settings,1)+encoder.encodePage(raster,1,1,settings)+encoder.encodeJobEnd()
             if (paper == PaperSize.A5 && !landscape && dpi == 300) {
                 val sha = java.security.MessageDigest.getInstance("SHA-256").digest(job).joinToString("") { "%02x".format(it.toInt() and 255) }
-                assertEquals("Deterministic A5 source fixture", "87d7748ea9d3120400e86af6f85e5e5eba6c7c614a3255f3190dbe2678d01998", sha)
+                assertEquals("Deterministic compressed A5 source fixture", "e9cdd01a50f37b16def915b6b19bb0f3a9a7a7210783e6108cf2d50e41d944f9", sha)
             }
             val pieces=packets(job)
             assertTrue(job.size <= paper.getPixelWidth(600)*paper.getPixelHeight(600)*3/8+200000)
