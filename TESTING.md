@@ -1,55 +1,37 @@
-# Physical Testing & Verification Guide
+# Verification
 
-This document defines the milestone testing methodology for validating **LBP OTG Print** against physical Canon hardware.
+## Automated checks
 
----
+```sh
+./gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease :app:bundleRelease
+./gradlew :app:connectedDebugAndroidTest
+```
 
-## 📋 Engineering Milestones Checklist
+Host tests cover strict/Persian page ranges, settings validation, explicit PCL 5 detection, rejection of unavailable Canon encoders, locale-independent IEEE-1284 parsing, raster packing, per-page PCL framing, printer status, copies, cancellation, overlapping jobs, lock release, offline file export, transparency/dithering and margin clipping. Raster/lifecycle tests run on simulated APIs 28 and 36.
 
-| Milestone | Description | Verification Criteria | Status |
-|---|---|---|---|
-| **MILESTONE 1** | USB detection & diagnostics | Phone detects Canon printer over OTG; descriptors parsed and visible in Diagnostics screen. | **MET** |
-| **MILESTONE 2** | Real USB communication | Interface claimed successfully; IEEE-1284 string read; port status (`0x18`) queried. | **MET** |
-| **MILESTONE 3** | Driver & raster pipeline | Document rendered to 1-bit raster; CCITT G4 compressed; CARPS2 stream generated. | **MET** |
-| **MILESTONE 4** | Print monochrome test page | Test page sent to physical printer; printer accepts job and ejects page. | **IN-PROGRESS (Hardware Validation)** |
-| **MILESTONE 5** | Print one raster image | JPEG/PNG rendered and dithered; printed correctly. | **READY** |
-| **MILESTONE 6** | Print a one-page PDF | Single-page PDF rendered via `PdfRenderer`; printed correctly. | **READY** |
-| **MILESTONE 7** | Multi-page PDF & options | Multi-page PDF printed with correct page ranges, copies, and scaling. | **READY** |
-| **MILESTONE 8** | Production UI | Bilingual Persian/English UI with responsive RTL layout. | **MET** |
-| **MILESTONE 9** | Android PrintService | System-wide printing from external apps via `LbpPrintService`. | **MET** |
+Native PDF tests run on an Android emulator/device: PDF snapshots, concurrent previews, original-file removal, physical-size/landscape rendering, duplicate ownership, malformed-file cleanup, bounded incremental PDF export and actual exported-page rendering. Robolectric's native PDF stubs do not establish native PdfRenderer correctness, so these tests belong in androidTest.
 
----
+Compose device tests exercise launch/preview, language toggling, disabled USB output without permission, diagnostics, offline PCL generation and terminal dialog dismissal. GitHub Actions runs the host checks and API 35 device tests and saves reports.
 
-## 🧪 Physical Device Experiment Runbook
+See VERIFICATION.md for the results of this specific candidate, including any test environment limitations. Passing software tests does not establish physical print compatibility.
 
-### Experiment 1: Safe USB Probe
-1. Connect Canon LBP6030 to Android phone via USB OTG cable.
-2. Open **LBP OTG Print**.
-3. Tap **"عیب‌یابی USB" (USB Diagnostics)** in the top bar.
-4. Tap **"پویش ایمن USB" (Run Safe USB Probe)**.
-5. **Expected Result:**
-   - Toast/message: `پویش موفق: LBP6030... | وضعیت درگاه: READY (Paper OK, Online)`.
-   - In descriptors list: Vendor ID `0x04A9`, Product ID `0x2795`, Permission `YES`, Interface Claimed `YES`.
-6. **Artifact to export:** Tap **"Export TXT Report"** or **"JSON Report"** and send to engineering.
+## Physical acceptance (required before production claims)
 
-### Experiment 2: File Stream Dump (Zero-Risk Driver Verification)
-1. In the app main screen, scroll down to **تنظیمات چاپ (Print Settings)**.
-2. Change **موتور درایور چاپگر (Driver Engine)** to:
-   `File Stream Dump (Debug Only)`.
-3. Tap **"چاپ" (Print)**.
-4. **Expected Result:**
-   - Progress dialog displays: Rendering → Encoding → Completed.
-   - A `.bin` stream capture file is saved to app storage (e.g. `last_job_..._carps2.bin`).
-   - File size is typically 50–150 KB.
+Use real API 26/28/35/36 phones with USB OTG and representative PCL 5 printers. Canon LBP6030 tests cannot proceed until a real Canon backend exists.
 
-### Experiment 3: Physical Test Page Printing
-1. Ensure Driver Engine is set to **Canon CARPS2**.
-2. Tap **"صفحه آزمایش" (Test Page)**.
-3. Tap **"چاپ" (Print)**.
-4. **Expected Behavior:**
-   - Progress bar progresses through 100% chunked transmission.
-   - Printer status LED flashes green.
-   - Physical paper feeds and prints the test page.
-5. **If Printer Errors (Blinking Red / Orange):**
-   - Tap **"عیب‌یابی USB"** → **"JSON Report"**.
-   - Note down the exact LED blink code on the physical printer.
+| Scenario | Required evidence |
+| --- | --- |
+| Attach and permission grant/deny/reconnect | Correct device selection, no crashes, request cannot be spoofed or overwritten |
+| Safe probe | Correct IEEE-1284 string and status; no transmitted document bytes |
+| PCL test page, text PDF, image | Correct physical page content, media, margins and orientation |
+| Multi-page PDF and multiple copies | Exact selected pages and copy count in document order |
+| Paper empty, offline or error | Recoverable failure; no false completion |
+| Cable removal during a write | Bounded failure and closed connection; reconnect works |
+| Cancellation during render/send | Busy state clears, USB lock releases, no automatic duplicate retry; previously sent pages may still print |
+| Probe/second app PrintService job during a UI job | No competing opens or closes; recoverable busy state |
+| Low-memory device | 300 DPI works; 600 DPI is rejected below 256 MB memory class |
+| Rotation, background, external share, malformed/encrypted file | No closed-document races or activity crashes; invalid import preserves prior document |
+| Android Save PDF, installed print service and app PrintService | Page subsets/copies, layout/cancel behavior and final output verified |
+| Release on 16 KB page-size Android | Startup, imports, exports and printing verified using the optimized APK |
+
+Retain the phone/printer model, OS version, diagnostics report, printed pages/photos and candidate APK SHA-256 for each result. Do not mark milestones as passed without that evidence.

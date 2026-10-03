@@ -11,7 +11,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -62,9 +66,13 @@ import com.example.ui.components.PrintSettingsPanel
 import com.example.ui.strings.AppText
 import com.example.ui.theme.PrimaryBlue
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun MainScreen(viewModel: MainViewModel) {
+fun MainScreen(viewModel: MainViewModel, onSystemPrint: (com.example.document.DocumentSource, com.example.core.model.PrintSettings) -> Unit) {
+    val isLoading by viewModel.isLoading.collectAsState()
+    val isPrinting by viewModel.isPrinting.collectAsState()
+    val streamFile by viewModel.printJobManager.lastCapturedStreamFile.collectAsState()
+    val devices by viewModel.allDevices.collectAsState()
     val isPersian by viewModel.isPersian.collectAsState()
     val activeDevice by viewModel.activeDeviceInfo.collectAsState()
     val currentDoc by viewModel.currentDocument.collectAsState()
@@ -161,18 +169,20 @@ fun MainScreen(viewModel: MainViewModel) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .navigationBarsPadding()
                             .padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Button(
-                            onClick = { viewModel.startPrint() },
+                            onClick = { viewModel.prepareSystemPrint(onSystemPrint) },
+                            enabled = currentDoc != null && !isLoading && !isPrinting,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .widthIn(max = 500.dp)
-                                .height(52.dp)
+                                .heightIn(min = 52.dp)
                                 .testTag("print_button"),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Print,
@@ -181,7 +191,7 @@ fun MainScreen(viewModel: MainViewModel) {
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = AppText.t(isPersian, "چاپ", "Print"),
+                                text = AppText.t(isPersian, "چاپ با اندروید / ذخیره PDF", "Print / Save PDF"),
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -199,8 +209,8 @@ fun MainScreen(viewModel: MainViewModel) {
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 680.dp) // Maintain pleasant ergonomics on tablets and foldables
+                        .widthIn(max = 680.dp)
+                        .fillMaxWidth() // Maintain pleasant ergonomics on tablets and foldables
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp)
                 ) {
@@ -212,6 +222,21 @@ fun MainScreen(viewModel: MainViewModel) {
                         onOpenDiagnostics = { viewModel.setDiagnosticsSheetVisible(true) }
                     )
 
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(AppText.t(isPersian,
+                        "چاپ USB مستقیم فقط برای PCL 5 است. درایور Canon LBP6030 در این نسخه موجود نیست. چاپ اندروید به سرویس سازگار با چاپگر نیاز دارد.",
+                        "Direct USB printing supports PCL 5 only. Canon LBP6030 requires a driver that is not included. Android printing requires a service compatible with your printer."),
+                        style = MaterialTheme.typography.bodyMedium)
+                    if (devices.count { it.primaryPrinterInterface != null } > 1) {
+                        devices.filter { it.primaryPrinterInterface != null }.forEach { device ->
+                            OutlinedButton(onClick = { viewModel.usbRepository.selectDeviceByName(device.deviceName) }, enabled = !isPrinting) {
+                                Text((if (activeDevice?.deviceName == device.deviceName) "✓ " else "") + (device.productName ?: device.deviceName))
+                            }
+                        }
+                    }
+                    if (isLoading) {
+                        androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // 2. Document Selection Buttons
@@ -223,14 +248,16 @@ fun MainScreen(viewModel: MainViewModel) {
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    Row(
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         FilledTonalButton(
                             onClick = { pdfPickerLauncher.launch(arrayOf("application/pdf")) },
+                            enabled = !isPrinting,
                             modifier = Modifier
-                                .weight(1f)
+                                .widthIn(min = 140.dp)
                                 .testTag("select_pdf_button")
                         ) {
                             Icon(
@@ -249,8 +276,9 @@ fun MainScreen(viewModel: MainViewModel) {
                                 )
                             },
                             modifier = Modifier
-                                .weight(1f)
-                                .testTag("select_image_button")
+                                .widthIn(min = 140.dp)
+                                .testTag("select_image_button"),
+                            enabled = !isPrinting
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Image,
@@ -263,8 +291,9 @@ fun MainScreen(viewModel: MainViewModel) {
 
                         OutlinedButton(
                             onClick = { viewModel.loadTestPage() },
+                            enabled = !isPrinting,
                             modifier = Modifier
-                                .weight(1f)
+                                .widthIn(min = 140.dp)
                                 .testTag("test_page_button")
                         ) {
                             Icon(
@@ -297,10 +326,25 @@ fun MainScreen(viewModel: MainViewModel) {
                     PrintSettingsPanel(
                         settings = settings,
                         isPersian = isPersian,
-                        onSettingsChanged = { viewModel.updateSettings(it) }
+                        onSettingsChanged = { viewModel.updateSettings(it) },
+                        allowActualSize = currentDoc is com.example.document.PdfDocumentSource
                     )
 
-                    Spacer(modifier = Modifier.height(80.dp)) // Clearance for bottom bar
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedButton(onClick = { viewModel.startPrint() },
+                        enabled = currentDoc != null && !isLoading && !isPrinting &&
+                            (settings.driverType == com.example.core.model.DriverType.FILE_STREAM_DUMP || activeDevice?.permissionGranted == true),
+                        modifier = Modifier.fillMaxWidth().testTag("usb_print_button")) {
+                        Text(AppText.t(isPersian,
+                            if (settings.driverType == com.example.core.model.DriverType.FILE_STREAM_DUMP) "ساخت فایل PCL" else "ارسال با USB (PCL 5)",
+                            if (settings.driverType == com.example.core.model.DriverType.FILE_STREAM_DUMP) "Create PCL file" else "Send via USB (PCL 5)"))
+                    }
+                    if (streamFile != null) {
+                        OutlinedButton(onClick = { viewModel.shareStream() }, modifier = Modifier.fillMaxWidth()) {
+                            Text(AppText.t(isPersian, "اشتراک فایل PCL", "Share PCL file"))
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(24.dp)) // Clearance for bottom bar
                 }
             }
 
@@ -326,7 +370,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 job = currentJob,
                 isPersian = isPersian,
                 onCancel = { viewModel.cancelPrint() },
-                onDismiss = { viewModel.printJobManager.cancelCurrentJob() }
+                onDismiss = { viewModel.printJobManager.dismissJob() }
             )
         }
     }

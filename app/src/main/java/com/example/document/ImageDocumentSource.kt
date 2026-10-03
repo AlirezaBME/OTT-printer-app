@@ -5,20 +5,39 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
-import android.media.ExifInterface
+import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.InputStream
 
 class ImageDocumentSource(
     private val context: Context,
-    val uri: Uri,
+    inputUri: Uri,
     override val title: String = "Image.png"
 ) : DocumentSource {
 
+    private val snapshot = java.io.File.createTempFile("image_", ".img", context.cacheDir)
+    val uri: Uri = Uri.fromFile(snapshot)
+    init {
+        try {
+            val input = context.contentResolver.openInputStream(inputUri) ?: error("Cannot read this image")
+            input.use { source -> snapshot.outputStream().use { output ->
+                val buffer = ByteArray(65536)
+                var count = 0L
+                while (true) {
+                    val size = source.read(buffer)
+                    if (size < 0) break
+                    count += size
+                    require(count <= 64L * 1024 * 1024) { "Image exceeds the 64 MB limit." }
+                    output.write(buffer, 0, size)
+                }
+            } }
+        } catch (e: Exception) { snapshot.delete(); throw e }
+    }
     override val totalPages: Int = 1
 
     override suspend fun renderPage(pageIndex: Int, targetWidth: Int, targetHeight: Int): Bitmap = withContext(Dispatchers.IO) {
+        require(pageIndex == 0) { "Image has only one page" }
         // Step 1: Decode bounds only
         val boundsOptions = BitmapFactory.Options().apply {
             inJustDecodeBounds = true
@@ -35,7 +54,7 @@ class ImageDocumentSource(
 
         // Calculate sample size
         var sampleSize = 1
-        while ((origW / sampleSize) > (targetWidth * 1.5) || (origH / sampleSize) > (targetHeight * 1.5)) {
+        while ((origW / sampleSize) > targetWidth.coerceAtMost(2048) || (origH / sampleSize) > targetHeight.coerceAtMost(2048)) {
             sampleSize *= 2
         }
 
@@ -63,6 +82,8 @@ class ImageDocumentSource(
                     ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
                     ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
                     ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
+                    ExifInterface.ORIENTATION_TRANSPOSE -> { matrix.postRotate(90f); matrix.postScale(-1f, 1f) }
+                    ExifInterface.ORIENTATION_TRANSVERSE -> { matrix.postRotate(270f); matrix.postScale(-1f, 1f) }
                 }
                 if (!matrix.isIdentity) {
                     val rotated = Bitmap.createBitmap(
@@ -77,5 +98,6 @@ class ImageDocumentSource(
         decoded!!
     }
 
-    override fun close() {}
+    override fun duplicate(): DocumentSource = ImageDocumentSource(context, uri, title)
+    override fun close() { snapshot.delete() }
 }

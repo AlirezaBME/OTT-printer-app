@@ -9,6 +9,9 @@ data class Ieee1284DeviceId(
     val description: String = "",
     val rawKeyValues: Map<String, String> = emptyMap()
 ) {
+    val supportsPcl5: Boolean
+        get() = commandSet.any { it.uppercase(java.util.Locale.ROOT) in setOf("PCL", "PCL5", "PCL5E", "PCL5C", "PCL 5", "PCL 5E", "PCL 5C") }
+
     val supportsCarps2: Boolean
         get() = commandSet.any { it.contains("CARPS", ignoreCase = true) }
         
@@ -26,13 +29,9 @@ object Ieee1284Parser {
             return Ieee1284DeviceId(rawString = "")
         }
         val length = ((rawBytes[0].toInt() and 0xFF) shl 8) or (rawBytes[1].toInt() and 0xFF)
-        val stringBytes = if (rawBytes.size >= length && length > 2) {
-            rawBytes.copyOfRange(2, length)
-        } else if (rawBytes.size > 2) {
-            rawBytes.copyOfRange(2, rawBytes.size)
-        } else {
-            rawBytes
-        }
+        // A truncated command set must never be mistaken for PCL (for example PCLXL cut after PCL).
+        if (length !in 2..rawBytes.size) return Ieee1284DeviceId(rawString = "")
+        val stringBytes = rawBytes.copyOfRange(2, length)
         val rawStr = String(stringBytes, Charsets.US_ASCII).trim()
         return parseString(rawStr)
     }
@@ -45,7 +44,7 @@ object Ieee1284Parser {
             if (trimmed.isEmpty()) continue
             val colonIdx = trimmed.indexOf(':')
             if (colonIdx > 0) {
-                val key = trimmed.substring(0, colonIdx).trim().uppercase()
+                val key = trimmed.substring(0, colonIdx).trim().uppercase(java.util.Locale.ROOT)
                 val value = trimmed.substring(colonIdx + 1).trim()
                 map[key] = value
             }

@@ -11,7 +11,7 @@ val Slate200 = Color(0xFFE2E8F0)
 val Slate100 = Color(0xFFF1F5F9)
 val Slate50  = Color(0xFFF8FAFC)
 
-val PrimaryBlue = Color(0xFF0284C7)
+val PrimaryBlue = Color(0xFF0369A1)
 val PrimaryBlueDark = Color(0xFF0369A1)
 val PrimaryBlueLight = Color(0xFF38BDF8)
 

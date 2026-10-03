@@ -79,7 +79,7 @@ fun DocumentPreviewCard(
                 Icon(
                     imageVector = Icons.Default.Description,
                     contentDescription = "Document",
-                    tint = PrimaryBlue,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -96,7 +96,7 @@ fun DocumentPreviewCard(
                     Text(
                         text = "${documentSource.totalPages} ${AppText.t(isPersian, "صفحه", "pages")}",
                         fontSize = 13.sp,
-                        color = Slate600
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -125,21 +125,21 @@ fun DocumentPreviewCard(
                             contentDescription = "Page Preview",
                             contentScale = ContentScale.Fit,
                             modifier = Modifier
-                                .aspectRatio(1f / 1.414f) // Standard A4 ratio
+                                .aspectRatio(previewBitmap.width.toFloat() / previewBitmap.height) // Standard A4 ratio
                                 .testTag("preview_image")
                         )
                     }
                 } else if (documentSource != null) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(36.dp),
-                        color = PrimaryBlue,
+                        color = MaterialTheme.colorScheme.primary,
                         strokeWidth = 3.dp
                     )
                 } else {
                     Text(
                         text = AppText.t(isPersian, "برای پیش‌نمایش، سند PDF یا عکس انتخاب کنید", "Select a PDF or Photo to preview"),
                         fontSize = 13.sp,
-                        color = Slate600
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

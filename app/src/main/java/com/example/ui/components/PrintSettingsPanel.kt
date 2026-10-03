@@ -57,6 +57,7 @@ fun PrintSettingsPanel(
     settings: PrintSettings,
     isPersian: Boolean,
     onSettingsChanged: (PrintSettings) -> Unit,
+    allowActualSize: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -76,7 +77,7 @@ fun PrintSettingsPanel(
                 Icon(
                     imageVector = Icons.Default.Settings,
                     contentDescription = "Settings",
-                    tint = PrimaryBlue,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -196,7 +197,7 @@ fun PrintSettingsPanel(
             )
             Spacer(modifier = Modifier.height(6.dp))
 
-            val scalings = listOf(PrintScaling.FIT_PAGE, PrintScaling.FILL_PAGE, PrintScaling.ACTUAL_SIZE)
+            val scalings = if (allowActualSize) listOf(PrintScaling.FIT_PAGE, PrintScaling.FILL_PAGE, PrintScaling.ACTUAL_SIZE) else listOf(PrintScaling.FIT_PAGE, PrintScaling.FILL_PAGE)
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 scalings.forEachIndexed { index, scale ->
                     val label = when (scale) {
@@ -243,6 +244,15 @@ fun PrintSettingsPanel(
 
             Spacer(modifier = Modifier.height(14.dp))
 
+            Text(AppText.t(isPersian, "کیفیت چاپ USB:", "USB print quality:"), style = MaterialTheme.typography.labelLarge)
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                listOf(PrintQuality.DRAFT_300DPI, PrintQuality.NORMAL_600DPI).forEachIndexed { index, quality ->
+                    SegmentedButton(selected = settings.quality == quality,
+                        onClick = { onSettingsChanged(settings.copy(quality = quality)) },
+                        shape = SegmentedButtonDefaults.itemShape(index, 2)) { Text("${quality.dpi} DPI") }
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
             // Driver Engine Dropdown
             var driverExpanded by remember { mutableStateOf(false) }
             ExposedDropdownMenuBox(
@@ -264,7 +274,7 @@ fun PrintSettingsPanel(
                     expanded = driverExpanded,
                     onDismissRequest = { driverExpanded = false }
                 ) {
-                    DriverType.entries.forEach { dt ->
+                    listOf(DriverType.RAW_PCL, DriverType.FILE_STREAM_DUMP).forEach { dt ->
                         DropdownMenuItem(
                             text = { Text(dt.displayName, fontSize = 13.sp) },
                             onClick = {
@@ -282,11 +292,12 @@ fun PrintSettingsPanel(
             var ditherExpanded by remember { mutableStateOf(false) }
             ExposedDropdownMenuBox(
                 expanded = ditherExpanded,
-                onExpandedChange = { ditherExpanded = !ditherExpanded },
+                onExpandedChange = { if (settings.contentMode == PrintContentMode.PHOTO) ditherExpanded = !ditherExpanded },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 OutlinedTextField(
-                    value = settings.ditherAlgorithm.displayName,
+                    value = if (settings.contentMode == PrintContentMode.DOCUMENT_TEXT) AppText.t(isPersian, "آستانه برای متن", "Threshold for text") else settings.ditherAlgorithm.displayName,
+                    enabled = settings.contentMode == PrintContentMode.PHOTO,
                     onValueChange = {},
                     readOnly = true,
                     label = { Text(AppText.t(isPersian, "الگوریتم ترام (Dither)", "Dithering Algorithm"), fontSize = 12.sp) },

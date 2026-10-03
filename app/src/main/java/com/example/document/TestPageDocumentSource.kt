@@ -16,7 +16,7 @@ class TestPageDocumentSource(
     private val deviceInfo: UsbDeviceInfo? = null
 ) : DocumentSource {
 
-    override val title: String = "Canon_LBP_TestPage.pdf"
+    override val title: String = "OTG_Print_TestPage.pdf"
     override val totalPages: Int = 1
 
     override suspend fun renderPage(pageIndex: Int, targetWidth: Int, targetHeight: Int): Bitmap = withContext(Dispatchers.Default) {
@@ -58,7 +58,7 @@ class TestPageDocumentSource(
         // 2. Title Header
         textPaint.isFakeBoldText = true
         textPaint.textSize = 48f * scale
-        val title = "Canon LBP6030 / LBP6040 / LBP6018L"
+        val title = "OTG Printer — Test Page"
         val subtitle = "USB OTG DIRECT PRINT ENGINE — DIAGNOSTIC TEST PAGE"
         var y = margin + (80f * scale)
         canvas.drawText(title, margin + (40f * scale), y, textPaint)
@@ -79,11 +79,11 @@ class TestPageDocumentSource(
         val timestamp = sdf.format(Date())
 
         val dev = deviceInfo
-        val vid = dev?.vendorIdHex ?: "0x04A9"
-        val pid = dev?.productIdHex ?: "0x2795"
-        val mfg = dev?.manufacturerName ?: dev?.ieee1284?.manufacturer ?: "Canon,Inc."
-        val prod = dev?.productName ?: dev?.ieee1284?.model ?: "LBP6030/6030B/6018L"
-        val cmd = dev?.ieee1284?.commandSet?.joinToString(", ") ?: "CARPS2, UFRII LT"
+        val vid = dev?.vendorIdHex ?: "Not connected"
+        val pid = dev?.productIdHex ?: "Not connected"
+        val mfg = dev?.manufacturerName ?: dev?.ieee1284?.manufacturer ?: "Not connected"
+        val prod = dev?.productName ?: dev?.ieee1284?.model ?: "Not connected"
+        val cmd = dev?.ieee1284?.commandSet?.joinToString(", ") ?: "Unknown"
 
         canvas.drawText("• Hardware Identification: $mfg $prod", margin + (50f * scale), y, textPaint)
         y += 35f * scale
@@ -189,5 +189,12 @@ class TestPageDocumentSource(
         bitmap
     }
 
+    override suspend fun renderForPrint(pageIndex: Int, settings: com.example.core.model.PrintSettings): Bitmap {
+        val w = settings.paperSize.getPixelWidth(settings.quality.dpi)
+        val h = settings.paperSize.getPixelHeight(settings.quality.dpi)
+        return if (settings.orientation == com.example.core.model.PrintOrientation.LANDSCAPE) renderPage(pageIndex, h, w)
+        else renderPage(pageIndex, w, h)
+    }
+    override fun duplicate(): DocumentSource = TestPageDocumentSource(deviceInfo)
     override fun close() {}
 }

@@ -21,11 +21,23 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        handleIncomingIntent(intent)
+        if (savedInstanceState == null) handleIncomingIntent(intent)
 
         setContent {
             MyApplicationTheme {
-                MainScreen(viewModel = viewModel)
+                MainScreen(viewModel = viewModel, onSystemPrint = { source, settings ->
+                    try {
+                        val manager = getSystemService(android.content.Context.PRINT_SERVICE) as android.print.PrintManager
+                        val media = when (settings.paperSize) {
+                            com.example.core.model.PaperSize.A4 -> android.print.PrintAttributes.MediaSize.ISO_A4
+                            com.example.core.model.PaperSize.A5 -> android.print.PrintAttributes.MediaSize.ISO_A5
+                            com.example.core.model.PaperSize.LETTER -> android.print.PrintAttributes.MediaSize.NA_LETTER
+                        }
+                        manager.print(source.title, com.example.printing.DocumentPrintAdapter(application as LbpOtgApplication, source, settings),
+                            android.print.PrintAttributes.Builder().setMediaSize(if (settings.orientation == com.example.core.model.PrintOrientation.LANDSCAPE) media.asLandscape() else media.asPortrait())
+                                .setColorMode(android.print.PrintAttributes.COLOR_MODE_MONOCHROME).build())
+                    } catch (e: Exception) { source.close(); viewModel.reportError(e.message ?: "Cannot open print dialog") }
+                })
             }
         }
     }
@@ -53,7 +65,7 @@ class MainActivity : ComponentActivity() {
                     intent.getParcelableExtra(Intent.EXTRA_STREAM)
                 }
                 val type = intent.type ?: ""
-                if (uri != null) {
+                if (uri != null && uri.scheme == "content") {
                     if (type.contains("pdf", ignoreCase = true)) {
                         viewModel.loadPdfUri(uri)
                     } else if (type.startsWith("image/")) {
@@ -65,7 +77,7 @@ class MainActivity : ComponentActivity() {
             Intent.ACTION_VIEW -> {
                 val data = intent.data
                 val type = intent.type ?: ""
-                if (data != null) {
+                if (data != null && data.scheme == "content") {
                     if (type.contains("pdf", ignoreCase = true) || data.toString().endsWith(".pdf", ignoreCase = true)) {
                         viewModel.loadPdfUri(data)
                     } else {

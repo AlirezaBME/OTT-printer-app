@@ -87,7 +87,7 @@ fun PrinterStatusCard(
                     Icon(
                         imageVector = Icons.Default.Print,
                         contentDescription = "Printer",
-                        tint = PrimaryBlue,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -97,8 +97,8 @@ fun PrinterStatusCard(
                 Column(modifier = Modifier.weight(1f)) {
                     val displayName = when {
                         deviceInfo?.isLbp6030Family == true -> AppText.targetPrinter()
-                        deviceInfo != null -> deviceInfo.productName ?: "Canon Laser Printer"
-                        else -> AppText.targetPrinter()
+                        deviceInfo != null -> deviceInfo.productName ?: "USB Printer"
+                        else -> AppText.t(isPersian, "چاپگر USB", "USB Printer")
                     }
 
                     Text(
@@ -129,7 +129,7 @@ fun PrinterStatusCard(
                             text = statusText,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium,
-                            color = if (deviceInfo != null && deviceInfo.permissionGranted) StatusGreen else Slate600
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -166,7 +166,7 @@ fun PrinterStatusCard(
                         }
                         SuggestionChip(
                             onClick = {},
-                            label = { Text(portLabel, fontSize = 11.sp, color = if (deviceInfo.portStatus.paperEmpty) StatusRed else StatusGreen) },
+                            label = { Text(portLabel, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                             colors = SuggestionChipDefaults.suggestionChipColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant
                             )
@@ -185,17 +185,22 @@ fun PrinterStatusCard(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
+            if (deviceInfo?.permissionGranted == true && deviceInfo.ieee1284?.supportsPcl5 != true) {
+                Text(AppText.t(isPersian, "برای بررسی سازگاری پویش USB را اجرا کنید. تشخیص دستگاه به معنی پشتیبانی چاپ نیست.",
+                    "Run the USB probe to check compatibility. Detection alone does not establish print support."),
+                    style = MaterialTheme.typography.bodySmall)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
             // Action row
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.End
             ) {
                 if (deviceInfo != null && !deviceInfo.permissionGranted) {
                     Button(
                         onClick = onRequestPermission,
                         modifier = Modifier.testTag("grant_permission_button"),
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
                         Text(AppText.t(isPersian, "اعطای مجوز USB", "Grant USB Permission"), fontSize = 13.sp)
                     }

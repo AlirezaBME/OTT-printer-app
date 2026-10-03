@@ -1,62 +1,10 @@
-# USB Protocol Notes — Canon Laser Printers
+# USB transport contract
 
-## 1. USB Device Identifiers
-
-| Device | Vendor ID | Product ID | Class / Subclass / Protocol |
-|---|---|---|---|
-| **Canon LBP6030 / LBP6040 / LBP6018L** | `0x04A9` (1193) | `0x2795` (10133) | `0x07` / `0x01` / `0x02` |
-| **Canon LBP6000 / LBP6018** | `0x04A9` (1193) | `0x271A` (10010) | `0x07` / `0x01` / `0x02` |
-| **Canon LBP6020 / LBP6020B** | `0x04A9` (1193) | `0x275F` (10079) | `0x07` / `0x01` / `0x02` |
-| **Canon LBP6200** | `0x04A9` (1193) | `0x273B` (10043) | `0x07` / `0x01` / `0x02` |
-| **Canon LBP6230** | `0x04A9` (1193) | `0x2796` (10134) | `0x07` / `0x01` / `0x02` |
-
----
-
-## 2. Standard USB Printer Class 1.1 Control Requests
-
-All requests are issued to the printer interface (recipient = Interface, type = Class).
-
-### A. GET_DEVICE_ID
-- **`bmRequestType`**: `0xA1` (10100001b: Device-to-Host, Class, Interface)
-- **`bRequest`**: `0x00` (`GET_DEVICE_ID`)
-- **`wValue`**: Configuration index (typically `0`)
-- **`wIndex`**: Interface index (typically `0`)
-- **`wLength`**: Buffer length (typically `1024` bytes)
-- **Return format:**
-  - Bytes 0..1: 16-bit big-endian length of descriptor string `N` including length bytes.
-  - Bytes 2..N-1: ASCII string conforming to IEEE-1284 Device ID syntax (`KEY:VALUE;KEY:VALUE;...`).
-
-### B. GET_PORT_STATUS
-- **`bmRequestType`**: `0xA1`
-- **`bRequest`**: `0x01` (`GET_PORT_STATUS`)
-- **`wValue`**: `0`
-- **`wIndex`**: Interface index
-- **`wLength`**: `1`
-- **Return format:** Single byte bitmask:
-  - **Bit 5 (`0x20`)**: Paper Empty (`1` = Paper empty / out, `0` = Paper present)
-  - **Bit 4 (`0x10`)**: Selected (`1` = Printer selected / on-line, `0` = Off-line)
-  - **Bit 3 (`0x08`)**: Not Error (`1` = Normal state, `0` = Hardware error condition)
-  - *Standard ready state:* `0x18` (Selected = 1, Not Error = 1, Paper Empty = 0).
-
-### C. SOFT_RESET
-- **`bmRequestType`**: `0x21` (Host-to-Device, Class, Interface)
-- **`bRequest`**: `0x02` (`SOFT_RESET`)
-- **`wValue`**: `0`
-- **`wIndex`**: Interface index
-- **`wLength`**: `0`
-- Resets bulk endpoints without renegotiating USB descriptors.
-
----
-
-## 3. Endpoints & Transfer Policies
-
-- **Bulk OUT Endpoint (typically `0x01` or `0x02`):**
-  - Used for streaming binary print jobs (CARPS2 or UFRII LT).
-  - Max packet size: `64` bytes (USB 2.0 Full-Speed) or `512` bytes (USB 2.0 High-Speed).
-  - Safe chunk size: **`16384` bytes (16 KB)**.
-  - Transfer timeout: **15,000 ms**.
-  - Always verify that the returned byte count from `bulkTransfer()` equals the chunk length requested.
-
-- **Bulk IN Endpoint (typically `0x81` or `0x82`):**
-  - Used for reading printer hardware responses and status query replies.
-  - Timeout: **5,000 ms**.
+- Discover a USB Printer Class 7 interface with protocol 1/2 and bulk OUT. Protocol 3 (IEEE-1284.4) is not supported.
+- Request per-device Android USB permission using a package-scoped immutable PendingIntent. Match the returned device and verify permission through UsbManager.
+- One application-wide mutex owns each open/claim/probe/send/close cycle. No diagnostic probe interrupts an active print job.
+- GET_DEVICE_ID: bmRequestType 0xA1, request 0, configuration index 0, wIndex `(interfaceId << 8) | alternateSetting`. The response starts with a big-endian length including two length bytes.
+- GET_PORT_STATUS: bmRequestType 0xA1, request 1, wValue 0, wIndex interfaceId. Bit 3 is NotError, bit 4 Selected, bit 5 PaperEmpty.
+- USB writes use at most 16 KB, a finite three-second transfer timeout and a cancellation check between chunks. Positive partial writes advance by the actual byte count. Zero/negative writes fail; never automatically resend an ambiguous failed transfer.
+- Direct output requires CMD to explicitly contain PCL/PCL5/PCL5e/PCL5c (including spaced spellings). Unknown IDs, CARPS2, UFRII LT and PCL XL-only devices are rejected before transmitting.
+- The Printer Class port status is not a per-job physical completion acknowledgement. Never infer paper ejection from successful transfer or an elapsed delay.

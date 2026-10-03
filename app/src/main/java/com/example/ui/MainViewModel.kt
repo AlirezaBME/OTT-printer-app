@@ -3,228 +3,192 @@ package com.example.ui
 import android.app.Application
 import android.graphics.Bitmap
 import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.core.model.PrintJob
-import com.example.core.model.PrintJobState
-import com.example.core.model.PrintSettings
+import com.example.LbpOtgApplication
+import com.example.core.model.*
 import com.example.diagnostics.DiagnosticsRepository
-import com.example.document.DocumentSource
-import com.example.document.ImageDocumentSource
-import com.example.document.PdfDocumentSource
-import com.example.document.TestPageDocumentSource
+import com.example.document.*
 import com.example.jobs.PrintJobManager
-import com.example.usb.UsbDeviceInfo
-import com.example.usb.UsbDeviceRepository
-import com.example.usb.UsbTraceEvent
 import com.example.usb.UsbTraceLogger
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
-
-    val usbRepository = UsbDeviceRepository(application, viewModelScope)
-    val printJobManager = PrintJobManager(application, usbRepository, viewModelScope)
-    val diagnosticsRepository = DiagnosticsRepository(application, usbRepository)
-
-    val activeDeviceInfo: StateFlow<UsbDeviceInfo?> = usbRepository.activeDeviceInfo
-    val allDevices: StateFlow<List<UsbDeviceInfo>> = usbRepository.allDevices
-    val currentJob: StateFlow<PrintJob?> = printJobManager.currentJob
-    val traceLogs: StateFlow<List<UsbTraceEvent>> = UsbTraceLogger.eventsFlow
-
-    private val _isPersian = MutableStateFlow(true) // Default Persian as requested
-    val isPersian: StateFlow<Boolean> = _isPersian.asStateFlow()
-
+    private val app = application as LbpOtgApplication
+    val usbRepository = app.usbRepository
+    val printJobManager = PrintJobManager(app, usbRepository, viewModelScope)
+    val diagnosticsRepository = DiagnosticsRepository(app, usbRepository)
+    val activeDeviceInfo = usbRepository.activeDeviceInfo
+    val allDevices = usbRepository.allDevices
+    val currentJob = printJobManager.currentJob
+    val isPrinting = printJobManager.isBusy
+    val traceLogs = UsbTraceLogger.eventsFlow
+    private val preferences = app.getSharedPreferences("preferences", 0)
+    private val _isPersian = MutableStateFlow(preferences.getBoolean("persian", java.util.Locale.getDefault().language == "fa"))
+    val isPersian = _isPersian.asStateFlow()
     private val _currentDocument = MutableStateFlow<DocumentSource?>(null)
-    val currentDocument: StateFlow<DocumentSource?> = _currentDocument.asStateFlow()
-
+    val currentDocument = _currentDocument.asStateFlow()
     private val _previewBitmap = MutableStateFlow<Bitmap?>(null)
-    val previewBitmap: StateFlow<Bitmap?> = _previewBitmap.asStateFlow()
-
+    val previewBitmap = _previewBitmap.asStateFlow()
     private val _selectedPageIndex = MutableStateFlow(0)
-    val selectedPageIndex: StateFlow<Int> = _selectedPageIndex.asStateFlow()
-
+    val selectedPageIndex = _selectedPageIndex.asStateFlow()
     private val _printSettings = MutableStateFlow(PrintSettings())
-    val printSettings: StateFlow<PrintSettings> = _printSettings.asStateFlow()
-
+    val printSettings = _printSettings.asStateFlow()
     private val _showDiagnosticsSheet = MutableStateFlow(false)
-    val showDiagnosticsSheet: StateFlow<Boolean> = _showDiagnosticsSheet.asStateFlow()
-
+    val showDiagnosticsSheet = _showDiagnosticsSheet.asStateFlow()
     private val _statusMessage = MutableStateFlow<String?>(null)
-    val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
-
+    val statusMessage = _statusMessage.asStateFlow()
     private val _isSafeProbing = MutableStateFlow(false)
-    val isSafeProbing: StateFlow<Boolean> = _isSafeProbing.asStateFlow()
-
-    init {
-        // Automatically load test page initially so the user immediately has an operable document ready to print
-        loadTestPage()
-    }
-
+    val isSafeProbing = _isSafeProbing.asStateFlow()
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading = _isLoading.asStateFlow()
+    private val documentMutex = Mutex()
+    private var loadGeneration = 0
+    private var loadJob: Job? = null
+    private var previewJob: Job? = null
+    init { loadTestPage() }
     fun toggleLanguage() {
         _isPersian.value = !_isPersian.value
+        preferences.edit().putBoolean("persian", _isPersian.value).apply()
     }
-
-    fun setDiagnosticsSheetVisible(visible: Boolean) {
-        _showDiagnosticsSheet.value = visible
-    }
-
-    fun clearStatusMessage() {
-        _statusMessage.value = null
-    }
-
+    fun setDiagnosticsSheetVisible(visible: Boolean) { _showDiagnosticsSheet.value = visible }
+    fun clearStatusMessage() { _statusMessage.value = null }
+    fun reportError(message: String) { _statusMessage.value = message }
     fun requestUsbPermission() {
         usbRepository.requestPermissionForActiveDevice { granted ->
-            _statusMessage.value = if (granted) {
-                if (_isPersian.value) "مجوز دسترسی به USB با موفقیت داده شد." else "USB permission granted successfully."
-            } else {
-                if (_isPersian.value) "مجوز دسترسی به USB رد شد." else "USB permission denied."
-            }
+            _statusMessage.value = if (granted) text("مجوز USB داده شد.", "USB permission granted.") else text("مجوز USB رد شد.", "USB permission denied.")
+            if (granted) runSafeProbe()
         }
     }
-
-    fun refreshUsbDevices() {
-        usbRepository.refreshDevices()
-    }
-
-    fun loadTestPage() {
-        viewModelScope.launch {
-            _currentDocument.value?.close()
-            val source = TestPageDocumentSource(activeDeviceInfo.value)
-            _currentDocument.value = source
-            _selectedPageIndex.value = 0
-            updatePreview(source, 0)
-        }
-    }
-
-    fun loadPdfUri(uri: Uri) {
-        viewModelScope.launch {
+    fun refreshUsbDevices() = usbRepository.refreshDevices()
+    private fun displayName(uri: Uri): String = try {
+        app.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+            if (it.moveToFirst()) it.getString(0)?.take(200) else null
+        } ?: "Document"
+    } catch (_: Exception) { "Document" }
+    fun loadTestPage() = loadDocument { TestPageDocumentSource(activeDeviceInfo.value) }
+    fun loadPdfUri(uri: Uri) = loadDocument { PdfDocumentSource(app, uri, displayName(uri)) }
+    fun loadImageUri(uri: Uri) = loadDocument { ImageDocumentSource(app, uri, displayName(uri)) }
+    private fun loadDocument(factory: () -> DocumentSource) {
+        if (isPrinting.value) { reportError(text("تا پایان چاپ صبر کنید.", "Wait for the current job to finish.")); return }
+        val generation = ++loadGeneration
+        loadJob?.cancel()
+        previewJob?.cancel()
+        loadJob = viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            _isLoading.value = true
             try {
-                _currentDocument.value?.close()
-                val source = PdfDocumentSource(getApplication(), uri, uri.lastPathSegment ?: "document.pdf")
-                _currentDocument.value = source
-                _selectedPageIndex.value = 0
-                updatePreview(source, 0)
-                _statusMessage.value = if (_isPersian.value) "سند PDF بارگذاری شد (${source.totalPages} صفحه)" else "PDF loaded (${source.totalPages} pages)"
-            } catch (e: Exception) {
-                UsbTraceLogger.logError("MainViewModel", "Failed to open PDF", e)
-                _statusMessage.value = if (_isPersian.value) "خطا در باز کردن فایل PDF: ${e.message}" else "Failed to open PDF: ${e.message}"
-            }
+                documentMutex.withLock {
+                    // Keep the previous document when the new file is invalid. Clean up cancelled loads.
+                    var newSource: DocumentSource? = null
+                    var newPreview: Bitmap? = null
+                    var adopted = false
+                    try {
+                        withContext(NonCancellable + Dispatchers.IO) {
+                            newSource = factory()
+                            newPreview = newSource!!.renderPage(0, 800, 1132)
+                        }
+                        ensureActive()
+                        _currentDocument.value?.close()
+                        _currentDocument.value = newSource
+                        _previewBitmap.value = newPreview
+                        _selectedPageIndex.value = 0
+                        _printSettings.value = _printSettings.value.copy(pageRangeText = "ALL", scaling = if (newSource is PdfDocumentSource) _printSettings.value.scaling else PrintScaling.FIT_PAGE)
+                        adopted = true
+                    } finally {
+                        if (!adopted) { newSource?.close(); newPreview?.recycle() }
+                    }
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { reportError(text("باز کردن سند ناموفق بود: ", "Cannot open document: ") + e.message) }
+            finally { if (loadGeneration == generation) _isLoading.value = false }
         }
     }
-
-    fun loadImageUri(uri: Uri) {
-        viewModelScope.launch {
-            try {
-                _currentDocument.value?.close()
-                val source = ImageDocumentSource(getApplication(), uri, uri.lastPathSegment ?: "image.png")
-                _currentDocument.value = source
-                _selectedPageIndex.value = 0
-                updatePreview(source, 0)
-                _statusMessage.value = if (_isPersian.value) "تصویر با موفقیت بارگذاری شد" else "Image loaded successfully"
-            } catch (e: Exception) {
-                UsbTraceLogger.logError("MainViewModel", "Failed to open image", e)
-                _statusMessage.value = if (_isPersian.value) "خطا در باز کردن تصویر: ${e.message}" else "Failed to open image: ${e.message}"
-            }
-        }
-    }
-
     fun selectPage(index: Int) {
-        val doc = _currentDocument.value ?: return
-        if (index in 0 until doc.totalPages) {
-            _selectedPageIndex.value = index
-            updatePreview(doc, index)
+        previewJob?.cancel()
+        previewJob = viewModelScope.launch {
+            documentMutex.withLock {
+                val doc = _currentDocument.value ?: return@withLock
+                if (index !in 0 until doc.totalPages) return@withLock
+                try {
+                    val preview = withContext(Dispatchers.IO) { doc.renderPage(index, 800, 1132) }
+                    _previewBitmap.value = preview
+                    _selectedPageIndex.value = index
+                } catch (e: CancellationException) { throw e }
+                catch (e: Exception) { reportError(e.message ?: "Preview failed") }
+            }
         }
     }
-
-    private fun updatePreview(doc: DocumentSource, pageIndex: Int) {
+    fun updateSettings(settings: PrintSettings) { if (!isPrinting.value) _printSettings.value = settings }
+    fun startPrint() {
+        if (_isLoading.value) return
+        val doc = _currentDocument.value ?: return
+        printJobManager.startPrintJob(doc, _printSettings.value) { state ->
+            if (state is PrintJobState.Completed) reportError(
+                if (_printSettings.value.driverType == DriverType.FILE_STREAM_DUMP) text("فایل PCL آماده اشتراک‌گذاری است.", "PCL file ready to share.")
+                else text("داده‌ها ارسال شدند. خروجی چاپگر را بررسی کنید.", "Data sent. Check the printer for the printed pages.")
+            )
+        }
+    }
+    fun prepareSystemPrint(onReady: (DocumentSource, PrintSettings) -> Unit) {
+        if (_isLoading.value || isPrinting.value) return
         viewModelScope.launch {
             try {
-                val preview = withContext(Dispatchers.IO) {
-                    doc.renderPage(pageIndex, 1000, 1414)
+                _printSettings.value.validate()
+                val settings = _printSettings.value.let { selected ->
+                    if (selected.orientation == PrintOrientation.AUTO) {
+                        val preview = _previewBitmap.value
+                        selected.copy(orientation = if (preview != null && preview.width > preview.height) PrintOrientation.LANDSCAPE else PrintOrientation.PORTRAIT)
+                    } else selected
                 }
-                _previewBitmap.value = preview
-            } catch (e: Exception) {
-                UsbTraceLogger.logError("MainViewModel", "Failed to render preview", e)
-            }
+                var copy: DocumentSource? = null
+                var handedOff = false
+                try {
+                    documentMutex.withLock {
+                        val doc = _currentDocument.value ?: error("Select a document first")
+                        settings.parsePageIndices(doc.totalPages)
+                        withContext(NonCancellable + Dispatchers.IO) { copy = doc.duplicate() }
+                    }
+                    ensureActive()
+                    onReady(copy!!, settings)
+                    handedOff = true
+                } finally { if (!handedOff) copy?.close() }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { reportError(e.message ?: "Cannot start system printing") }
         }
     }
-
-    fun updateSettings(newSettings: PrintSettings) {
-        _printSettings.value = newSettings
-    }
-
-    fun startPrint() {
-        val doc = _currentDocument.value
-        if (doc == null) {
-            _statusMessage.value = if (_isPersian.value) "ابتدا یک سند برای چاپ انتخاب کنید." else "Please select a document first."
-            return
-        }
-
-        printJobManager.startPrintJob(doc, _printSettings.value) { finalState ->
-            when (finalState) {
-                is PrintJobState.Completed -> {
-                    _statusMessage.value = if (_isPersian.value) "چاپ با موفقیت انجام شد!" else "Print job completed successfully!"
-                }
-                is PrintJobState.Failed -> {
-                    _statusMessage.value = if (_isPersian.value) "خطا در چاپ: ${finalState.reason}" else "Print failed: ${finalState.reason}"
-                }
-                is PrintJobState.Cancelled -> {
-                    _statusMessage.value = if (_isPersian.value) "چاپ لغو گردید." else "Print job cancelled."
-                }
-                else -> {}
-            }
-        }
-    }
-
-    fun cancelPrint() {
-        printJobManager.cancelCurrentJob()
-    }
-
+    fun cancelPrint() = printJobManager.cancelCurrentJob()
     fun runSafeProbe() {
+        if (_isSafeProbing.value) return
         viewModelScope.launch {
             _isSafeProbing.value = true
-            val res = usbRepository.safeProbe()
-            _isSafeProbing.value = false
-            if (res.isSuccess) {
-                val dev = res.getOrThrow()
-                val msg = if (_isPersian.value) {
-                    "پویش موفق: ${dev.productName ?: "چاپگر"} | وضعیت درگاه: ${dev.portStatus?.toDisplayString() ?: "تایید شد"}"
-                } else {
-                    "Probe Success: ${dev.productName} | Port: ${dev.portStatus?.toDisplayString() ?: "OK"}"
-                }
-                _statusMessage.value = msg
-            } else {
-                val err = res.exceptionOrNull()?.message ?: "خطای ناشناخته"
-                _statusMessage.value = if (_isPersian.value) "خطا در پویش چاپگر: $err" else "Probe failed: $err"
-            }
+            try {
+                val result = usbRepository.safeProbe()
+                reportError(result.fold({ text("پویش انجام شد: ", "Probe finished: ") + (it.portStatus?.toDisplayString() ?: "Status unavailable") }, { it.message ?: "Probe failed" }))
+            } finally { _isSafeProbing.value = false }
         }
     }
-
-    fun copyDiagnostics() {
-        val ok = diagnosticsRepository.copyReportToClipboard()
-        _statusMessage.value = if (ok) {
-            if (_isPersian.value) "مشخصات عیب‌یابی در حافظه کپی شد." else "Diagnostics copied to clipboard."
-        } else {
-            if (_isPersian.value) "خطا در کپی مشخصات." else "Failed to copy."
-        }
-    }
-
+    fun copyDiagnostics() { diagnosticsRepository.copyReportToClipboard(); reportError(text("گزارش کپی شد.", "Report copied.")) }
     fun shareDiagnosticsReport(asJson: Boolean) {
-        diagnosticsRepository.shareReport(getApplication(), asJson)
+        try { diagnosticsRepository.shareReport(app, asJson) } catch (e: Exception) { reportError(e.message ?: "Cannot share report") }
     }
-
-    fun clearTraceLogs() {
-        UsbTraceLogger.clear()
-        _statusMessage.value = if (_isPersian.value) "گزارش وقایع پاک شد." else "Logs cleared."
+    fun shareStream() {
+        val file = printJobManager.lastCapturedStreamFile.value ?: return
+        try { diagnosticsRepository.shareFile(app, file, "application/octet-stream", "Export PCL file") }
+        catch (e: Exception) { reportError(e.message ?: "Cannot share file") }
     }
-
+    fun clearTraceLogs() = UsbTraceLogger.clear()
+    private fun text(fa: String, en: String) = if (_isPersian.value) fa else en
     override fun onCleared() {
+        val doc = _currentDocument.value
+        app.applicationScope.launch {
+            printJobManager.cancelAndJoin()
+            documentMutex.withLock { withContext(Dispatchers.IO) { doc?.close() } }
+        }
         super.onCleared()
-        _currentDocument.value?.close()
     }
 }

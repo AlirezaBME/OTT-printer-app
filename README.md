@@ -1,102 +1,30 @@
 # LBP OTG Print
 
-**LBP OTG Print** is a specialized native Android application designed for **direct, offline printing to Canon laser printers** over a physical USB OTG cable.
+Native Android utility for opening PDFs and images, saving PDFs through Android's print dialog, USB printer diagnostics, and direct monochrome printing to devices that explicitly advertise **PCL 5**.
 
-It operates entirely on-device without Wi-Fi, without a computer, without cloud services, and without requiring any Internet connection.
+**Release status: candidate for testing, not a validated Canon LBP6030 driver.** The original AI-generated CARPS2/UFRII LT commands were fabricated. They have been removed. Detecting a Canon printer does not mean the app can print to it. The LBP6030/6040/6018L family needs a genuine, compatible driver and physical validation before it can be supported.
 
----
+## Use
 
-## 🎯 Target Printer Hardware
+1. Choose a PDF, photo, or the built-in test page.
+2. Select paper, orientation, scaling, copies, and page ranges. Persian and Arabic digits are accepted.
+3. **Print / Save PDF** opens Android's print dialog. Save as PDF works offline. Physical printing needs an installed service compatible with the destination printer; this does not add Canon USB support.
+4. For a PCL 5 USB printer, connect an OTG cable, grant USB permission, and run the safe probe in Diagnostics. **Send via USB (PCL 5)** checks compatibility again before transmitting.
+5. **Export PCL file** renders a real PCL 5 stream without a printer. Use Share PCL file to export it. “Data sent” is transport delivery, not proof that paper printed.
 
-This application is built for the **Canon LBP6030 / LBP6040 / LBP6018L** family:
+Supported input: one PDF or JPEG/PNG/WebP image at a time, up to 64 MB. PDFs can contain up to 10,000 pages. USB jobs are capped at 256 MB. Password-protected, malformed, or inaccessible documents produce a recoverable error and preserve the previous selection. Images are downsampled to a maximum 2048-pixel decoded side to bound memory. PDF 100% scaling uses PDF points; image controls offer Fit and Fill.
 
-| Parameter | Observed Hardware Value |
-|---|---|
-| **Target Models** | Canon LBP6030, LBP6030B, LBP6030w, LBP6040, LBP6018L |
-| **Vendor ID (VID)** | `0x04A9` (1193 decimal) |
-| **Product ID (PID)** | `0x2795` (10133 decimal) |
-| **Manufacturer String** | `Canon,Inc.` |
-| **Product String** | `LBP6030/6030B/6018L` |
-| **USB Class** | Class 7 (Printers), Subclass 1, Protocol 1 or 2 |
-| **Printer Languages** | CARPS2, UFRII LT |
+Android 8.0+ (API 26). Targets API 36. No Internet, broad storage, location, camera, or photo-library permissions. Imported documents stay in private cache; cloud backup is disabled. See [privacy policy](PRIVACY.md).
 
-*(The app also supports related models in the family such as LBP6000, LBP6020, LBP6200, LBP6230, and any USB Printer Class 7 device via universal driver fallback).*
+## Build
 
----
+Install JDK 21, Android SDK platform 36 and build-tools 36.0.0. Set `ANDROID_HOME` or add `sdk.dir` to an untracked `local.properties`.
 
-## 🚀 Key Features
-
-1. **Hardware USB OTG Direct Transport:**
-   - Enumerates physical USB descriptors.
-   - Dynamic USB permission negotiation.
-   - Safe chunked bulk transfer (16 KB packets) with timeout management and write verification.
-   - Standard USB Printer Class control transfers: IEEE-1284 Device ID reading and real-time port status (Paper Out, Online, Hardware Error).
-
-2. **Genuine Driver & Raster Pipeline:**
-   - **CARPS2 Driver Engine:** Generates genuine Canon CARPS2 commands with CCITT Group 4 (ITU-T T.6) 2D fax compressed raster streams.
-   - **UFRII LT Driver Engine:** Generates PJL encapsulated Canon UFRII LT command structures.
-   - **Raw PCL Engine:** Fallback laser driver.
-   - **File Stream Dump Mode:** Generates and exports raw `.bin` printer streams to disk for inspection and byte comparison without physical hardware.
-
-3. **High-Precision Image & Document Processing:**
-   - Direct PDF rendering via Android `PdfRenderer` (page-by-page, memory-safe, no OOM).
-   - Image rendering (JPEG, PNG, WEBP) with EXIF orientation correction.
-   - Multi-algorithm dithering:
-     - **Floyd-Steinberg Error Diffusion** (serpentine scanning).
-     - **Atkinson Dithering** (optimized for crisp halftone laser reproduction).
-     - **High-contrast Threshold** for crisp document text.
-   - Built-in alignment test page featuring corner crosshairs, font legibility ladder (6pt to 42pt), and 0–100% halftone ramp.
-
-4. **Production UI:**
-   - Bilingual: Full Persian (Farsi) with true RTL layout + English (LTR) toggle.
-   - Clean, professional utility aesthetics (no AI gradients, no floating glassmorphism).
-   - System PrintService integration (`LbpPrintService`) enabling other Android apps to print via the standard Android "Print" dialog.
-   - Share Intent support (`ACTION_SEND`, `ACTION_VIEW`).
-
----
-
-## 🛠️ Physical Device Quick Start Guide
-
-### What You Need:
-1. Android phone running Android 8.0+ (API 26+) with USB Host / OTG support.
-2. USB OTG adapter (USB-C or Micro-USB to USB-A Female).
-3. Standard USB Type-A to Type-B printer cable.
-4. Physical Canon LBP6030 / LBP6040 / LBP6018L printer turned on with paper loaded in tray.
-
-### Step-by-Step Procedure:
-1. **Connect Cable:** Plug the USB OTG adapter into your phone and connect the printer cable to your Canon printer.
-2. **Turn On Printer:** Power on the Canon printer and wait for its green ready LED to turn solid.
-3. **Open App:** Launch **LBP OTG Print**.
-4. **Grant USB Permission:** When prompted by the system dialog ("Allow LBP OTG Print to access LBP6030?"), tap **OK / Always allow**.
-5. **Check Printer Card:** The status card will show:
-   ```
-   Canon LBP6030/6040/6018L
-   ● متصل از طریق USB OTG
-   VID: 0x04A9 | PID: 0x2795 | کاغذ: آماده
-   ```
-6. **Print Test Page:**
-   - Tap **"صفحه آزمایش" (Test Page)**.
-   - Tap the primary blue button **"چاپ" (Print)** at the bottom.
-   - Observe progress: Preparing → Rendering → Encoding (CARPS2) → Transmitting → Paper Ejection.
-7. **Print Your Own PDF or Photo:**
-   - Tap **"انتخاب PDF"** or **"انتخاب عکس"**.
-   - Configure paper (A4 / Letter), orientation, and copies.
-   - Tap **"چاپ"**.
-
----
-
-## 📦 Building the APK
-
-### Debug APK:
-```bash
-gradle :app:assembleDebug
+```sh
+./gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleDebug
+./gradlew :app:assembleRelease :app:bundleRelease
 ```
-The resulting APK will be located at:
-`app/build/outputs/apk/debug/app-debug.apk`
 
-### Release APK:
-```bash
-gradle :app:assembleRelease
-```
-The resulting APK will be located at:
-`app/build/outputs/apk/release/app-release-unsigned.apk`
+The second command produces an unsigned release APK and AAB if no signing environment is configured. Signing uses `KEYSTORE_PATH`, `STORE_PASSWORD`, `KEY_ALIAS` (default `upload`), and `KEY_PASSWORD`. No private keys or passwords are stored in the repo. Google Play requires a signed AAB and Play App Signing, rather than the testing APK.
+
+See [audit](AUDIT.md), [architecture](ARCHITECTURE.md), [testing](TESTING.md), and [release runbook](RELEASE.md). GitHub Actions builds, tests, lints, and retains APK/AAB artifacts for each change.

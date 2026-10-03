@@ -48,7 +48,7 @@ class UsbPrinterDetector(
                 addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
                 addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
             }
-            context.registerReceiver(deviceReceiver, filter)
+            androidx.core.content.ContextCompat.registerReceiver(context, deviceReceiver, filter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
             isReceiverRegistered = true
             UsbTraceLogger.log(TAG, "UsbPrinterDetector started listening for USB attach/detach events.")
         }

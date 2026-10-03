@@ -13,7 +13,8 @@ class RasterPipeline {
         val paperBitmap = PageRenderer.renderPageToCanvas(sourceBitmap, settings)
 
         // Step 2: Dither to 1-bit monochrome raster
-        val rasterPage = DitherEngine.convertToRaster(
+        try {
+        return DitherEngine.convertToRaster(
             bitmap = paperBitmap,
             dpi = settings.quality.dpi,
             algorithm = settings.ditherAlgorithm,
@@ -22,10 +23,8 @@ class RasterPipeline {
             brightnessOffset = settings.brightnessOffset
         )
 
-        if (paperBitmap != sourceBitmap) {
-            paperBitmap.recycle()
+        } finally {
+            if (paperBitmap != sourceBitmap) paperBitmap.recycle()
         }
-
-        return rasterPage
     }
 }

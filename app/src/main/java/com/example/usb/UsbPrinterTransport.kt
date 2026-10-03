@@ -8,6 +8,8 @@ import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.coroutineContext
 
 class UsbPrinterTransport(
     private val usbManager: UsbManager
@@ -54,31 +56,18 @@ class UsbPrinterTransport(
 
         return try {
             var targetIf: UsbInterface? = null
-            // Try to find the interface by id or by index
             for (i in 0 until device.interfaceCount) {
                 val uif = device.getInterface(i)
-                if (uif.id == interfaceIndex) {
+                val hasOut = (0 until uif.endpointCount).any {
+                    val ep = uif.getEndpoint(it)
+                    ep.type == UsbConstants.USB_ENDPOINT_XFER_BULK && ep.direction == UsbConstants.USB_DIR_OUT
+                }
+                if (uif.id == interfaceIndex && uif.interfaceClass == 7 && uif.interfaceProtocol in 1..2 && hasOut) {
                     targetIf = uif
                     break
                 }
             }
-            if (targetIf == null && interfaceIndex < device.interfaceCount) {
-                targetIf = device.getInterface(interfaceIndex)
-            }
-            if (targetIf == null) {
-                // Fallback: locate printer class interface
-                for (i in 0 until device.interfaceCount) {
-                    val uif = device.getInterface(i)
-                    if (uif.interfaceClass == 7) {
-                        targetIf = uif
-                        break
-                    }
-                }
-            }
-            if (targetIf == null) {
-                targetIf = device.getInterface(0)
-            }
-
+            if (targetIf == null) return Result.failure(IllegalStateException("No supported USB printer interface."))
             UsbTraceLogger.log(TAG, "Claiming USB interface #${targetIf.id} (Class: ${targetIf.interfaceClass}, Subclass: ${targetIf.interfaceSubclass})")
             val claimed = conn.claimInterface(targetIf, true)
             if (!claimed) {
@@ -86,6 +75,10 @@ class UsbPrinterTransport(
                 return Result.failure(IllegalStateException("Could not claim USB interface #${targetIf.id}"))
             }
             claimedInterface = targetIf
+            if (targetIf.alternateSetting != 0 && !conn.setInterface(targetIf)) {
+                releaseInterface()
+                return Result.failure(IllegalStateException("Cannot select alternate USB interface"))
+            }
 
             // Discover bulk endpoints
             bulkOutEndpoint = null
@@ -157,6 +150,7 @@ class UsbPrinterTransport(
         val epOut = bulkOutEndpoint
             ?: return@withContext Result.failure(IllegalStateException("No bulk OUT endpoint"))
 
+        require(chunkSize in 1..16384 && timeoutMs > 0) { "Invalid USB transfer limits" }
         val totalBytes = data.size.toLong()
         var bytesWrittenTotal = 0L
         var offset = 0
@@ -165,17 +159,15 @@ class UsbPrinterTransport(
         val startTime = System.currentTimeMillis()
 
         while (offset < data.size) {
+            coroutineContext.ensureActive()
             val chunkLength = (data.size - offset).coerceAtMost(chunkSize)
-            val chunkBuffer = ByteArray(chunkLength)
-            System.arraycopy(data, offset, chunkBuffer, 0, chunkLength)
-
-            val written = conn.bulkTransfer(epOut, chunkBuffer, chunkLength, timeoutMs)
+            val written = conn.bulkTransfer(epOut, data, offset, chunkLength, timeoutMs)
             if (written < 0) {
                 val err = "USB bulk write failed at offset $offset with error code $written"
                 UsbTraceLogger.log(TAG, err, isError = true)
                 return@withContext Result.failure(IllegalStateException(err))
             }
-            if (written < chunkLength) {
+            if (written == 0 || written > chunkLength) {
                 val err = "USB short write: sent $written of requested $chunkLength bytes at offset $offset"
                 UsbTraceLogger.log(TAG, err, isError = true)
                 return@withContext Result.failure(IllegalStateException(err))
@@ -226,7 +218,7 @@ class UsbPrinterTransport(
         val conn = connection
             ?: return@withContext Result.failure(IllegalStateException("No USB connection"))
         val buf = ByteArray(1024)
-        val read = conn.controlTransfer(0xA1, 0, 0, interfaceIndex, buf, buf.size, 2000)
+        val read = conn.controlTransfer(0xA1, 0, 0, (interfaceIndex shl 8) or (claimedInterface?.alternateSetting ?: 0), buf, buf.size, 2000)
         if (read > 0) {
             val devId = Ieee1284Parser.parse(buf.copyOf(read))
             Result.success(devId)
