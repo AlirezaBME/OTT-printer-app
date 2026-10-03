@@ -87,7 +87,7 @@ fun PrintProgressDialog(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = when (state) {
-                        is PrintJobState.Completed -> AppText.t(isPersian, "داده‌های چاپ آماده شد", "Print data ready")
+                        is PrintJobState.Completed -> AppText.t(isPersian, "انتقال USB تکمیل شد", "USB transfer completed")
                         is PrintJobState.Failed -> AppText.t(isPersian, "خطا در چاپ", "Print Job Failed")
                         is PrintJobState.Cancelled -> AppText.t(isPersian, "چاپ لغو شد", "Print Job Cancelled")
                         else -> AppText.t(isPersian, "در حال ارسال به چاپگر", "Printing Document")
@@ -151,7 +151,7 @@ fun PrintProgressDialog(
 
                     is PrintJobState.DataSent -> {
                         Text(
-                            text = AppText.t(isPersian, "تمام بایت‌ها به بافر چاپگر منتقل شدند. در حال دریافت تاییدیه...", "All bytes transferred to printer buffer. Processing..."),
+                            text = AppText.t(isPersian, "تمام داده‌ها از طریق USB منتقل شدند. در حال بررسی پاسخ‌های چاپگر...", "All data transferred over USB. Observing printer responses..."),
                             fontSize = 14.sp,
                             color = StatusGreen
                         )
@@ -161,7 +161,7 @@ fun PrintProgressDialog(
 
                     is PrintJobState.Finishing -> {
                         Text(
-                            text = "${AppText.t(isPersian, "اتمام چاپ و خروج کاغذ", "Finishing and paper eject")}: ${state.message}",
+                            text = "${AppText.t(isPersian, "نهایی‌سازی نشست USB", "Finalizing USB session")}: ${state.message}",
                             fontSize = 14.sp
                         )
                         Spacer(modifier = Modifier.height(12.dp))
