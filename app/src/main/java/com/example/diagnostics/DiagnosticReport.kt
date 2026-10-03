@@ -99,7 +99,7 @@ object DiagnosticReport {
                 sb.append("  CMD: ${activeDevice.ieee1284.commandSet.joinToString(", ")}\n")
                 sb.append("  CID: ${activeDevice.ieee1284.compatibilityId}\n")
                 if (activeDevice.ieee1284.identifiesCanonUfriiLt) {
-                    sb.append("  Required backend: Canon UFRII LT / NCAP with CPCA job/session handling (unavailable in this app).\n")
+                    sb.append("  Backend: Canon UFRII LT / NCAP + CPCA print stream. Hardware output requires verification.\n")
                 }
                 sb.append("  DES: ${activeDevice.ieee1284.description}\n\n")
             }
@@ -160,7 +160,7 @@ object DiagnosticReport {
             ieee.put("compatibilityId", dev.ieee1284.compatibilityId)
             ieee.put("identifiesCanonUfriiLt", dev.ieee1284.identifiesCanonUfriiLt)
             ieee.put("advertisesCpca", dev.ieee1284.advertisesCpca)
-            ieee.put("directUsbDriverAvailable", dev.ieee1284.supportsPcl5)
+            ieee.put("directUsbDriverAvailable", dev.ieee1284.supportsPcl5 || com.example.driver.DriverRegistry.supportsCanon(dev))
             val cmds = JSONArray()
             dev.ieee1284.commandSet.forEach { cmds.put(it) }
             ieee.put("commandSet", cmds)

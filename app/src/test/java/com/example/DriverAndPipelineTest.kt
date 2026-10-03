@@ -26,8 +26,8 @@ class DriverAndPipelineTest {
             try { settings.validate(); fail("Accepted invalid settings") } catch (_: IllegalArgumentException) {}
         }
     }
-    @Test fun noCanonProtocolCanBeSelectedForTransmission() {
-        for (type in listOf(DriverType.CARPS2, DriverType.UFRII_LT)) {
+    @Test fun inventedCarpsProtocolRemainsUnavailable() {
+        for (type in listOf(DriverType.CARPS2)) {
             try { DriverRegistry.getEncoder(type); fail("Fabricated Canon driver reachable") } catch (_: IllegalArgumentException) {}
         }
     }

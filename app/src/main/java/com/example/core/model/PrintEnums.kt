@@ -30,8 +30,9 @@ enum class DitherAlgorithm(val displayName: String) {
 }
 
 enum class DriverType(val displayName: String, val id: String) {
+    AUTO("Automatic USB driver", "auto"),
     CARPS2("Canon CARPS2 (Unavailable)", "carps2"),
-    UFRII_LT("Canon UFRII LT (Unavailable)", "ufrii_lt"),
+    UFRII_LT("Canon LBP6030 UFRII LT", "ufrii_lt"),
     RAW_PCL("Standard Laser PCL Raster", "raw_pcl"),
     FILE_STREAM_DUMP("Export PCL file", "debug_dump")
 }

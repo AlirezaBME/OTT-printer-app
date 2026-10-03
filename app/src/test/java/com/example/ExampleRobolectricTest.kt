@@ -26,7 +26,7 @@ class ExampleRobolectricTest {
   }
 
   @Test
-  fun `Canon diagnostics report CID and actual app version without claiming a USB driver`() {
+  fun `Canon diagnostics report CID and actual app version identify the included USB driver`() {
     val id = Ieee1284Parser.parseString("MFG:Canon;CMD:LIPSLX,CPCA;CID:CA_UFRIILT_OIP;MDL:LBP6030/6040/6018L;")
     val device = UsbDeviceInfo("canon", 0x04a9, 0x2795, "Canon", "LBP6030", null, null,
       0, 0, 0, 0, emptyList(), true, ieee1284 = id)
@@ -37,9 +37,9 @@ class ExampleRobolectricTest {
     assertEquals("CA_UFRIILT_OIP", ieee.getString("compatibilityId"))
     assertTrue(ieee.getBoolean("identifiesCanonUfriiLt"))
     assertTrue(ieee.getBoolean("advertisesCpca"))
-    assertFalse(ieee.getBoolean("directUsbDriverAvailable"))
+    assertTrue(ieee.getBoolean("directUsbDriverAvailable"))
     val text = DiagnosticReport.generatePlainText(device, listOf(device))
     assertTrue(text.contains("CID: CA_UFRIILT_OIP"))
-    assertTrue(text.contains("CPCA job/session handling (unavailable in this app)"))
+    assertTrue(text.contains("NCAP + CPCA print stream"))
   }
 }

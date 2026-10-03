@@ -8,11 +8,11 @@ Full description:
 
 Open a PDF or photo from your phone, preview pages, select page ranges and copies, and prepare it for printing. LBP OTG Print includes English and Persian interfaces with right-to-left support.
 
-Print / Save PDF opens Android's standard print dialog. Save PDFs offline or use a print service compatible with your printer. Physical printing through Android depends on the installed service and printer compatibility.
+Android print / Save PDF opens Android's standard print dialog. Save PDFs offline or use a print service compatible with your printer. Physical printing through Android depends on the installed service and printer compatibility.
 
-USB OTG diagnostics show connected printer information and let you export a technical report. Direct monochrome USB output is limited to printers explicitly advertising PCL 5. Unknown languages and PCL XL-only devices are not supported. Export PCL files for inspection without a connected printer.
+USB OTG diagnostics show connected printer information and let you export a technical report. Direct monochrome USB output supports the explicitly identified Canon LBP6030 family (`04A9:2795`, UFRII LT / LIPSLX + CPCA) and printers advertising PCL 5. Unknown languages and PCL XL-only devices are not supported. Export PCL files for inspection without a connected printer.
 
-Canon LBP6030, LBP6040 and LBP6018L CARPS2/UFRII LT direct USB printing is not implemented in this candidate. Do not install it expecting a working Canon driver. USB detection alone does not establish print support.
+The Canon backend is a testing candidate whose encoding has been checked against Canon's official driver. Physical printer acceptance remains pending. Other Canon models and CARPS2 are unsupported. Final listing claims must follow physical acceptance evidence.
 
 Documents are processed locally. The app has no Internet permission, ads, analytics or account requirement. When you print or share files, your chosen Android service or recipient handles those files under its own privacy practices.
 

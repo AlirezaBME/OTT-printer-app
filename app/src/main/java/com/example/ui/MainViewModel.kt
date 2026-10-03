@@ -125,8 +125,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun updateSettings(settings: PrintSettings) { if (!isPrinting.value) _printSettings.value = settings }
     fun startPrint() {
-        if (_isLoading.value) return
+        if (_isLoading.value || isPrinting.value) return
         val doc = _currentDocument.value ?: return
+        if (_printSettings.value.driverType != DriverType.FILE_STREAM_DUMP) {
+            val device = activeDeviceInfo.value
+            if (device == null) { reportError(text("چاپگر را با کابل OTG وصل کنید.", "Connect a printer with a USB OTG cable.")); return }
+            if (!device.permissionGranted) {
+                usbRepository.requestPermissionForActiveDevice { granted ->
+                    if (granted) viewModelScope.launch { usbRepository.awaitRefresh(); startPrint() }
+                    else reportError(text("برای چاپ مجوز USB لازم است.", "USB permission is required to print."))
+                }
+                return
+            }
+        }
         printJobManager.startPrintJob(doc, _printSettings.value) { state ->
             if (state is PrintJobState.Completed) reportError(
                 if (_printSettings.value.driverType == DriverType.FILE_STREAM_DUMP) text("فایل PCL آماده اشتراک‌گذاری است.", "PCL file ready to share.")
@@ -178,7 +189,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun shareStream() {
         val file = printJobManager.lastCapturedStreamFile.value ?: return
-        try { diagnosticsRepository.shareFile(app, file, "application/octet-stream", "Export PCL file") }
+        try { diagnosticsRepository.shareFile(app, file, "application/octet-stream", "Export print stream") }
         catch (e: Exception) { reportError(e.message ?: "Cannot share file") }
     }
     fun clearTraceLogs() = UsbTraceLogger.clear()

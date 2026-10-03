@@ -174,7 +174,7 @@ fun MainScreen(viewModel: MainViewModel, onSystemPrint: (com.example.document.Do
                         contentAlignment = Alignment.Center
                     ) {
                         Button(
-                            onClick = { viewModel.prepareSystemPrint(onSystemPrint) },
+                            onClick = { viewModel.startPrint() },
                             enabled = currentDoc != null && !isLoading && !isPrinting,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -191,7 +191,9 @@ fun MainScreen(viewModel: MainViewModel, onSystemPrint: (com.example.document.Do
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = AppText.t(isPersian, "چاپ با اندروید / ذخیره PDF", "Print / Save PDF"),
+                                text = if (settings.driverType == com.example.core.model.DriverType.FILE_STREAM_DUMP)
+                                    AppText.t(isPersian, "ساخت فایل PCL", "Create PCL file")
+                                else AppText.t(isPersian, "چاپ با USB", "Print via USB"),
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -224,8 +226,8 @@ fun MainScreen(viewModel: MainViewModel, onSystemPrint: (com.example.document.Do
 
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(AppText.t(isPersian,
-                        "چاپ USB مستقیم فقط برای PCL 5 است. درایور Canon LBP6030 در این نسخه موجود نیست. چاپ اندروید به سرویس سازگار با چاپگر نیاز دارد.",
-                        "Direct USB printing supports PCL 5 only. Canon LBP6030 requires a driver that is not included. Android printing requires a service compatible with your printer."),
+                        "چاپ مستقیم USB برای Canon LBP6030/6040/6018L و PCL 5 آماده است. ابتدا مجوز USB را بدهید. برای ذخیره PDF از چاپ اندروید استفاده کنید.",
+                        "Direct USB printing supports Canon LBP6030/6040/6018L and PCL 5. Grant USB permission to connect. Use Android printing to save a PDF."),
                         style = MaterialTheme.typography.bodyMedium)
                     if (devices.count { it.primaryPrinterInterface != null } > 1) {
                         devices.filter { it.primaryPrinterInterface != null }.forEach { device ->
@@ -331,17 +333,15 @@ fun MainScreen(viewModel: MainViewModel, onSystemPrint: (com.example.document.Do
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedButton(onClick = { viewModel.startPrint() },
-                        enabled = currentDoc != null && !isLoading && !isPrinting &&
-                            (settings.driverType == com.example.core.model.DriverType.FILE_STREAM_DUMP || activeDevice?.permissionGranted == true),
-                        modifier = Modifier.fillMaxWidth().testTag("usb_print_button")) {
+                    OutlinedButton(onClick = { viewModel.prepareSystemPrint(onSystemPrint) },
+                        enabled = currentDoc != null && !isLoading && !isPrinting,
+                        modifier = Modifier.fillMaxWidth().testTag("android_print_button")) {
                         Text(AppText.t(isPersian,
-                            if (settings.driverType == com.example.core.model.DriverType.FILE_STREAM_DUMP) "ساخت فایل PCL" else "ارسال با USB (PCL 5)",
-                            if (settings.driverType == com.example.core.model.DriverType.FILE_STREAM_DUMP) "Create PCL file" else "Send via USB (PCL 5)"))
+                            "چاپ اندروید / ذخیره PDF", "Android print / Save PDF"))
                     }
                     if (streamFile != null) {
                         OutlinedButton(onClick = { viewModel.shareStream() }, modifier = Modifier.fillMaxWidth()) {
-                            Text(AppText.t(isPersian, "اشتراک فایل PCL", "Share PCL file"))
+                            Text(AppText.t(isPersian, "اشتراک فایل چاپ", "Share print stream"))
                         }
                     }
                     Spacer(modifier = Modifier.height(24.dp)) // Clearance for bottom bar

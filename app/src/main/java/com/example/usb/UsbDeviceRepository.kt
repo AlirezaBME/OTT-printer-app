@@ -14,10 +14,10 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** One application-wide repository and one lock for all USB jobs and probes. */
-class UsbDeviceRepository(private val context: Context, private val scope: CoroutineScope) {
+class UsbDeviceRepository(private val context: Context, private val scope: CoroutineScope, transportOverride: UsbTransport? = null) {
     private val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
     val permissionManager = UsbPermissionManager(context, usbManager)
-    val transport: UsbTransport = UsbPrinterTransport(usbManager)
+    val transport: UsbTransport = transportOverride ?: UsbPrinterTransport(usbManager)
     val operationMutex = Mutex()
     private val _activeDevice = MutableStateFlow<UsbDevice?>(null)
     val activeDevice = _activeDevice.asStateFlow()
@@ -26,9 +26,8 @@ class UsbDeviceRepository(private val context: Context, private val scope: Corou
     private val _allDevices = MutableStateFlow<List<UsbDeviceInfo>>(emptyList())
     val allDevices = _allDevices.asStateFlow()
     private val detector = UsbPrinterDetector(context, usbManager) { refreshDevices() }
-    init { detector.start(); refreshDevices() }
-
     private var refreshTask: kotlinx.coroutines.Job? = null
+    init { detector.start(); refreshDevices() }
     suspend fun awaitRefresh() { refreshTask?.join() }
 
     fun refreshDevices() {

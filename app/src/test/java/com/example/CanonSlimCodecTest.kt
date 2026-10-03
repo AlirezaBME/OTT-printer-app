@@ -28,10 +28,10 @@ class CanonSlimCodecTest {
         }
     }
 
-    @Test fun maximumBandHasBoundedExpansionAndRemainsAResearchComponent() {
+    @Test fun maximumBandHasBoundedExpansion() {
         val result = CanonSlimRasterCodec.encodeBand(ByteArray(CanonSlimRasterCodec.MAX_BAND_BYTES) { 0xff.toByte() })
         assertTrue(result.size <= CanonSlimRasterCodec.MAX_BAND_BYTES * 3 / 2 + 8)
-        for (type in listOf(com.example.core.model.DriverType.UFRII_LT, com.example.core.model.DriverType.CARPS2)) {
+        for (type in listOf(com.example.core.model.DriverType.CARPS2)) {
             try { com.example.driver.DriverRegistry.getEncoder(type); fail("Partial codec enabled as a USB driver") }
             catch (_: IllegalArgumentException) {}
         }

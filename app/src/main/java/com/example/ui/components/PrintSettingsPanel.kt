@@ -274,7 +274,7 @@ fun PrintSettingsPanel(
                     expanded = driverExpanded,
                     onDismissRequest = { driverExpanded = false }
                 ) {
-                    listOf(DriverType.RAW_PCL, DriverType.FILE_STREAM_DUMP).forEach { dt ->
+                    listOf(DriverType.AUTO, DriverType.UFRII_LT, DriverType.RAW_PCL, DriverType.FILE_STREAM_DUMP).forEach { dt ->
                         DropdownMenuItem(
                             text = { Text(dt.displayName, fontSize = 13.sp) },
                             onClick = {

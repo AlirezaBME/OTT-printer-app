@@ -185,7 +185,7 @@ fun PrinterStatusCard(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            if (deviceInfo?.permissionGranted == true && deviceInfo.ieee1284?.supportsPcl5 != true) {
+            if (deviceInfo?.permissionGranted == true && deviceInfo.ieee1284?.supportsPcl5 != true && !com.example.driver.DriverRegistry.supportsCanon(deviceInfo)) {
                 Text(AppText.t(isPersian, "برای بررسی سازگاری پویش USB را اجرا کنید. تشخیص دستگاه به معنی پشتیبانی چاپ نیست.",
                     "Run the USB probe to check compatibility. Detection alone does not establish print support."),
                     style = MaterialTheme.typography.bodySmall)

@@ -7,7 +7,7 @@ data class PrintSettings(
     val quality: PrintQuality = PrintQuality.DRAFT_300DPI,
     val contentMode: PrintContentMode = PrintContentMode.DOCUMENT_TEXT,
     val ditherAlgorithm: DitherAlgorithm = DitherAlgorithm.FLOYD_STEINBERG,
-    val driverType: DriverType = DriverType.RAW_PCL,
+    val driverType: DriverType = DriverType.AUTO,
     val copies: Int = 1,
     val marginMm: Float = 5.0f,
     val pageRangeText: String = "ALL", // "ALL", "1", "1-3,5"
