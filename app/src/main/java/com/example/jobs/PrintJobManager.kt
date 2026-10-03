@@ -118,7 +118,7 @@ class PrintJobManager(private val context: Context, private val usbRepository: U
                                 usbRepository.transport.queryPortStatus(printerInterfaceId).getOrNull()?.let { postStatus ->
                                     UsbTraceLogger.log(
                                         "PrintJobManager",
-                                        "Post-job USB printer status: ${postStatus.toDisplayString()} (0x${"%02X".format(postStatus.raw.toInt() and 0xff)})"
+                                        "Post-job USB printer status: ${postStatus.toDisplayString()} (0x${"%02X".format(postStatus.rawByte.toInt() and 0xff)})"
                                     )
                                 }
                             } else {
