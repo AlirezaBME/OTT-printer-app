@@ -42,6 +42,7 @@ jobs:
             ${{ runner.temp }}/canon-reference/reference-manifest.json
             ${{ runner.temp }}/canon-reference/reference-ncap-pdl.prn
             ${{ runner.temp }}/canon-reference/reference-cpca-job.prn
+            ${{ runner.temp }}/canon-reference/cpca-write-calls.tsv
             ${{ runner.temp }}/canon-reference/protocol-oracle-results.json
             ${{ runner.temp }}/canon-reference/mlp-oracle-results.json
             ${{ runner.temp }}/canon-reference/mlp-selection.log
