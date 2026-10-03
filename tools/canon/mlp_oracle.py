@@ -98,6 +98,37 @@ try:
         assert consumed==count
         assert packet==bytes([1,16,(count+6)>>8,(count+6)&255,1,0])+payload
         passed.append({'name':f'data-{count}','headerHex':packet[:6].hex(),'payloadBytes':consumed})
+    # Probe the native sender with the packet size negotiated by the user's
+    # LBP6030 (8192 total bytes). This is deliberately observational: it records
+    # how SendSub2 consumes a payload larger than one MLP packet so Android can
+    # mirror native segmentation rather than guessing continuation semantics.
+    payload=bytes((i*17)&255 for i in range(20000))
+    channel=port+0x148
+    C.c_ulong.from_address(channel+0x38).value=8192
+    offset=0
+    segmented=[]
+    while offset<len(payload):
+        C.c_ulong.from_address(channel+0x48).value=1
+        remaining=payload[offset:]
+        buffer=C.create_string_buffer(remaining)
+        send=(C.c_ulong*5)(C.addressof(buffer),len(remaining),0,0,0)
+        C.c_void_p.from_address(channel+0x58).value=C.addressof(send)
+        at=len(wire)
+        try:
+            rc=call('_ZN12C_MLCChannel8SendSub2Ev',channel)
+            transfers=wire[at:]
+            packet=b''.join(transfers)
+            consumed=int(send[2])
+            segmented.append({'rc':rc,'remainingBefore':len(remaining),'consumed':consumed,
+                              'transferSizes':[len(x) for x in transfers],
+                              'headerHex':packet[:6].hex() if len(packet)>=6 else packet.hex(),
+                              'packetBytes':len(packet)})
+            if rc!=0 or consumed<=0: break
+            offset+=consumed
+        finally:
+            C.c_void_p.from_address(channel+0x58).value=None
+    passed.append({'name':'segmentation-8192','payloadBytes':len(payload),
+                   'totalConsumed':offset,'segments':segmented})
     # Actual RecvSub restores one credit for an empty acknowledgement, even
     # when the header credit byte is zero. Do not infer DOT4 credit semantics.
     for credit_byte in [0,1,255]:
