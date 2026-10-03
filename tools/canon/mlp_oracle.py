@@ -129,6 +129,35 @@ try:
             C.c_void_p.from_address(channel+0x58).value=None
     passed.append({'name':'segmentation-8192','payloadBytes':len(payload),
                    'totalConsumed':offset,'segments':segmented})
+    # Model one real Info_commJobWrite call: keep the native send descriptor
+    # alive across credit cycles instead of constructing a new descriptor for each
+    # fragment. The reference CPCA capture contains a 39,598-byte write.
+    payload=bytes((i*13)&255 for i in range(39598))
+    channel=port+0x148
+    C.c_ulong.from_address(channel+0x38).value=8192
+    buffer=C.create_string_buffer(payload)
+    send=(C.c_ulong*5)(C.addressof(buffer),len(payload),0,0,0)
+    C.c_void_p.from_address(channel+0x58).value=C.addressof(send)
+    persistent=[]
+    previous=0
+    try:
+        for _ in range(16):
+            C.c_ulong.from_address(channel+0x48).value=1
+            at=len(wire)
+            rc=call('_ZN12C_MLCChannel8SendSub2Ev',channel)
+            transfers=wire[at:]
+            packet=b''.join(transfers)
+            current=int(send[2])
+            persistent.append({'rc':rc,'consumedField':current,'delta':current-previous,
+                               'transferSizes':[len(x) for x in transfers],
+                               'headerHex':packet[:6].hex() if len(packet)>=6 else packet.hex(),
+                               'packetBytes':len(packet)})
+            if rc!=0 or current<=previous or current>=len(payload): break
+            previous=current
+    finally:
+        C.c_void_p.from_address(channel+0x58).value=None
+    passed.append({'name':'persistent-write-39598-at-8192','payloadBytes':len(payload),
+                   'segments':persistent})
     # Actual RecvSub restores one credit for an empty acknowledgement, even
     # when the header credit byte is zero. Do not infer DOT4 credit semantics.
     for credit_byte in [0,1,255]:
