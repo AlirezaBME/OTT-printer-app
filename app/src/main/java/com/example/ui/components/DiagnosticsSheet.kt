@@ -213,6 +213,13 @@ fun DiagnosticsSheet(
                                     Text("  MFG: ${deviceInfo.ieee1284.manufacturer}", fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                                     Text("  MDL: ${deviceInfo.ieee1284.model}", fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                                     Text("  CMD: ${deviceInfo.ieee1284.commandSet.joinToString(", ")}", fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                                    Text("  CID: ${deviceInfo.ieee1284.compatibilityId}", fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                                    if (deviceInfo.ieee1284.identifiesCanonUfriiLt) {
+                                        Text(AppText.t(isPersian,
+                                            "این چاپگر به درایور Canon UFRII LT نیاز دارد؛ این درایور هنوز در برنامه موجود نیست.",
+                                            "This printer requires Canon UFRII LT; that driver is still unavailable in this app."),
+                                            fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
+                                    }
                                     Text("  RAW: ${deviceInfo.ieee1284.rawString}", fontSize = 10.sp, fontFamily = FontFamily.Monospace)
                                 }
 

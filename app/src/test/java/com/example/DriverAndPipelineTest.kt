@@ -38,6 +38,18 @@ class DriverAndPipelineTest {
             assertFalse(Ieee1284Parser.parseString("CMD:$languages;").supportsPcl5)
         }
     }
+    @Test fun physicalCanonIdentityRequiresUfriiLtWithoutEnablingPcl() {
+        val parsed = Ieee1284Parser.parseString("MFG:Canon;MDL:LBP6030/6040/6018L;CMD:LIPSLX,CPCA;CID:CA_UFRIILT_OIP;")
+        assertEquals("CA_UFRIILT_OIP", parsed.compatibilityId)
+        assertTrue(parsed.identifiesCanonUfriiLt)
+        assertTrue(parsed.supportsUfrii)
+        assertTrue(parsed.advertisesCpca)
+        assertFalse(parsed.supportsPcl5)
+        assertFalse(parsed.supportsCarps2)
+        // LIPSLX/CPCA alone is not a model-specific UFRII LT compatibility identifier.
+        assertFalse(Ieee1284Parser.parseString("CMD:LIPSLX,CPCA;").identifiesCanonUfriiLt)
+        assertFalse(Ieee1284Parser.parseString("CID:OTHER_UFR;CMD:PCLXL;").supportsPcl5)
+    }
     @Test fun lengthPrefixedPrinterIdAndLocaleAreHandled() {
         val original = Locale.getDefault()
         try {

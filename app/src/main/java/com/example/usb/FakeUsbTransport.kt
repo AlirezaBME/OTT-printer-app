@@ -90,7 +90,7 @@ class FakeUsbTransport(
     }
 
     override suspend fun queryIeee1284DeviceId(interfaceIndex: Int): Result<Ieee1284DeviceId> {
-        val mockRaw = "MFG:Canon;CMD:CARPS2,UFRII LT;MDL:LBP6030/6030B/6018L;CLS:PRINTER;DES:Canon LBP6030/6030B/6018L;"
+        val mockRaw = "MFG:Canon;CMD:LIPSLX,CPCA;CID:CA_UFRIILT_OIP;MDL:LBP6030/6040/6018L;CLS:PRINTER;DES:Canon LBP6030/6040/6018L;"
         return Result.success(Ieee1284Parser.parseString(mockRaw))
     }
 

@@ -31,7 +31,7 @@ No physical Canon printer or USB-capable Android device is attached to this work
 
 ## Release gates
 
-1. Canon-targeted release: implement and independently validate a genuine CARPS2/UFRII LT backend for Android. A transport or generic PCL encoder cannot substitute for it.
+1. Canon-targeted release: complete and independently validate the Canon UFRII LT / NCAP backend, including CPCA sessions, identified by the supplied `CA_UFRIILT_OIP` report. The decoder-validated SLIM raster component is one milestone, not a working driver. A transport or generic PCL encoder cannot substitute for it; see DRIVER_RESEARCH.md.
 2. Physical acceptance: real Android OTG devices and printers, correct test page/PDF/photo output, multiple copies/pages, paper-out, disconnect, denied permission, cancel and reconnect. Software tests do not replace this.
 3. Play publication: owner-controlled stable upload key, Play App Signing enrollment, Console access, verified developer account, listing assets/content rating/data-safety declarations and any required closed testing. No account-specific declarations have been fabricated.
 4. Confirm supported printer models and marketing claims from physical evidence. The candidate intentionally does not advertise Canon print compatibility.

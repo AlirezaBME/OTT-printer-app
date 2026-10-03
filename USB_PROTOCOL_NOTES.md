@@ -8,3 +8,5 @@
 - USB writes use at most 16 KB, a finite three-second transfer timeout and a cancellation check between chunks. Positive partial writes advance by the actual byte count. Zero/negative writes fail; never automatically resend an ambiguous failed transfer.
 - Direct output requires CMD to explicitly contain PCL/PCL5/PCL5e/PCL5c (including spaced spellings). Unknown IDs, CARPS2, UFRII LT and PCL XL-only devices are rejected before transmitting.
 - The Printer Class port status is not a per-job physical completion acknowledgement. Never infer paper ejection from successful transfer or an elapsed delay.
+
+The supplied Canon `04A9:2795` identity (`CID:CA_UFRIILT_OIP`, `CMD:LIPSLX,CPCA`) requires a UFRII LT / NCAP backend with CPCA session handling. Its valid USB endpoints and ready Printer Class status establish transport readiness only. The research SLIM raster codec and an NCAP PDL file generated without a session cannot replace CPCA setup, responses and teardown. Canon output remains blocked until a complete backend is independently validated; see tools/canon/README.md.

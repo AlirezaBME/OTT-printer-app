@@ -1,6 +1,7 @@
 package com.example.diagnostics
 
 import android.os.Build
+import com.example.BuildConfig
 import com.example.usb.UsbDeviceInfo
 import com.example.usb.UsbTraceLogger
 import org.json.JSONArray
@@ -19,7 +20,8 @@ object DiagnosticReport {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US)
         root.put("reportTimestamp", sdf.format(Date()))
         root.put("appName", "LBP OTG Print")
-        root.put("appVersion", "1.0")
+        root.put("appVersion", BuildConfig.VERSION_NAME)
+        root.put("appVersionCode", BuildConfig.VERSION_CODE)
 
         // Environment
         val env = JSONObject()
@@ -73,6 +75,7 @@ object DiagnosticReport {
         sb.append("         LBP OTG PRINT — USB DIAGNOSTIC REPORT      \n")
         sb.append("====================================================\n")
         sb.append("Timestamp: ${sdf.format(Date())}\n")
+        sb.append("App version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n")
         sb.append("Device: ${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE}, API ${Build.VERSION.SDK_INT})\n\n")
 
         sb.append("----------------------------------------------------\n")
@@ -94,6 +97,10 @@ object DiagnosticReport {
                 sb.append("  MFG: ${activeDevice.ieee1284.manufacturer}\n")
                 sb.append("  MDL: ${activeDevice.ieee1284.model}\n")
                 sb.append("  CMD: ${activeDevice.ieee1284.commandSet.joinToString(", ")}\n")
+                sb.append("  CID: ${activeDevice.ieee1284.compatibilityId}\n")
+                if (activeDevice.ieee1284.identifiesCanonUfriiLt) {
+                    sb.append("  Required backend: Canon UFRII LT / NCAP with CPCA job/session handling (unavailable in this app).\n")
+                }
                 sb.append("  DES: ${activeDevice.ieee1284.description}\n\n")
             }
 
@@ -150,6 +157,10 @@ object DiagnosticReport {
             ieee.put("raw", dev.ieee1284.rawString)
             ieee.put("manufacturer", dev.ieee1284.manufacturer)
             ieee.put("model", dev.ieee1284.model)
+            ieee.put("compatibilityId", dev.ieee1284.compatibilityId)
+            ieee.put("identifiesCanonUfriiLt", dev.ieee1284.identifiesCanonUfriiLt)
+            ieee.put("advertisesCpca", dev.ieee1284.advertisesCpca)
+            ieee.put("directUsbDriverAvailable", dev.ieee1284.supportsPcl5)
             val cmds = JSONArray()
             dev.ieee1284.commandSet.forEach { cmds.put(it) }
             ieee.put("commandSet", cmds)
